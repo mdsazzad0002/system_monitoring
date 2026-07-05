@@ -1,17 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 namespace SystemMonitoring\Core;
 
 use SystemMonitoring\Network\PingClient;
 
-class HealthChecker
+final class HealthChecker
 {
-    public static function check()
-    {
-        $ping = PingClient::ping();
+    public function __construct(
+        private readonly PingClient $pingClient
+    ) {
+    }
 
-        if (!$ping) {
-            FailureDetector::markFailed();
-        }
+    public function check(): array
+    {
+        return $this->pingClient->ping();
     }
 }

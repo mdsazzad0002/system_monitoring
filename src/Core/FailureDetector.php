@@ -1,18 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace SystemMonitoring\Core;
 
-class FailureDetector
+final class FailureDetector
 {
-    private static $failed = false;
-
-    public static function markFailed()
+    public function hasFailed(array $healthResult): bool
     {
-        self::$failed = true;
-    }
-
-    public static function isFailed()
-    {
-        return self::$failed;
+        return ! ($healthResult['ok'] ?? false);
     }
 }

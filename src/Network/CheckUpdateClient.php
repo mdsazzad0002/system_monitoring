@@ -6,7 +6,7 @@ namespace SystemMonitoring\Network;
 
 use SystemMonitoring\Support\HttpClient;
 
-final class RecoveryClient
+final class CheckUpdateClient
 {
     public function __construct(
         private readonly HttpClient $http,
@@ -14,24 +14,23 @@ final class RecoveryClient
     ) {
     }
 
-    public function recover(array $context = []): array
+    public function check(string $version): array
     {
-        $recoveryUrl = (string) ($this->config['recovery_url'] ?? '');
-
-        if ($recoveryUrl === '') {
+        if (($this->config['check_update_url'] ?? '') === '') {
             return [
                 'ok' => false,
                 'status' => 0,
-                'message' => 'Recovery URL is not configured.',
+                'message' => 'Update check URL is not configured.',
             ];
         }
 
-        $payload = array_merge([
+        $payload = [
             'software' => $this->config['software_id'] ?? '',
+            'version' => $version,
             'license_key' => $this->config['license'] ?? '',
-        ], $context);
+        ];
 
-        $response = $this->http->request('POST', $recoveryUrl, [
+        $response = $this->http->request('POST', $this->config['check_update_url'], [
             'timeout' => $this->config['request_timeout'] ?? 30,
             'headers' => ['Content-Type: application/x-www-form-urlencoded'],
             'body' => http_build_query($payload),
@@ -40,8 +39,9 @@ final class RecoveryClient
         return [
             'ok' => $response['ok'],
             'status' => $response['status'] ?? 0,
-            'body' => $response['body'] ?? '',
             'json' => $response['json'] ?? null,
+            'body' => $response['body'] ?? '',
+            'message' => $response['json']['message'] ?? null,
         ];
     }
 }

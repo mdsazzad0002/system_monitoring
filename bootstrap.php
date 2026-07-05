@@ -1,20 +1,30 @@
 <?php
 
+declare(strict_types=1);
+
 require_once __DIR__ . '/config.php';
 
-require_once __DIR__ . '/src/Core/HealthChecker.php';
-require_once __DIR__ . '/src/Core/FailureDetector.php';
-require_once __DIR__ . '/src/Core/RecoveryManager.php';
+spl_autoload_register(static function (string $class): void {
+    $prefix = 'SystemMonitoring\\';
+    if (! str_starts_with($class, $prefix)) {
+        return;
+    }
 
-require_once __DIR__ . '/src/Network/PingClient.php';
-require_once __DIR__ . '/src/Network/RecoveryClient.php';
+    $relative = substr($class, strlen($prefix));
+    $path = __DIR__ . '/src/' . str_replace('\\', DIRECTORY_SEPARATOR, $relative) . '.php';
 
-use SystemMonitoring\Core\HealthChecker;
-use SystemMonitoring\Core\FailureDetector;
-use SystemMonitoring\Core\RecoveryManager;
+    if (is_file($path)) {
+        require_once $path;
+    }
+});
 
-HealthChecker::check();
+use SystemMonitoring\Core\CycleRunner;
 
-if (FailureDetector::isFailed()) {
-    RecoveryManager::recover();
-}
+$options = [
+    'manual' => in_array('--manual', $argv ?? [], true),
+    'download' => in_array('--download-update', $argv ?? [], true),
+    'force_update_check' => in_array('--force-update-check', $argv ?? [], true),
+    'daemon' => in_array('--daemon', $argv ?? [], true),
+];
+
+exit(CycleRunner::run($options));

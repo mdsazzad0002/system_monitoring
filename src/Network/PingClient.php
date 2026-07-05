@@ -1,23 +1,41 @@
 <?php
 
+declare(strict_types=1);
+
 namespace SystemMonitoring\Network;
 
-class PingClient
+use SystemMonitoring\Support\HttpClient;
+
+final class PingClient
 {
-    public static function ping()
+    public function __construct(
+        private readonly HttpClient $http,
+        private readonly array $config
+    ) {
+    }
+
+    public function ping(): array
     {
-        $config = require __DIR__ . '/../../config.php';
+        if (($this->config['ping_url'] ?? '') === '') {
+            return [
+                'ok' => false,
+                'status' => 0,
+                'message' => 'Ping URL is not configured.',
+                'url' => '',
+            ];
+        }
 
-        $ch = curl_init($config['ping_url']);
+        $response = $this->http->request('GET', $this->config['ping_url'], [
+            'timeout' => $this->config['request_timeout'] ?? 30,
+        ]);
 
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-
-        $response = curl_exec($ch);
-        $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-        curl_close($ch);
-
-        return $http === 200;
+        return [
+            'ok' => $response['ok'] && ($response['status'] ?? 0) >= 200 && ($response['status'] ?? 0) < 300,
+            'status' => $response['status'] ?? 0,
+            'url' => $this->config['ping_url'],
+            'body' => $response['body'] ?? '',
+            'json' => $response['json'] ?? null,
+            'error' => $response['error'] ?? null,
+        ];
     }
 }

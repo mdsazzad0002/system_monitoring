@@ -1,0 +1,110 @@
+[2026-07-05 11:11:51] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-EHOE-CBBL-NOIY-VIEI HTTP=200
+[2026-07-05 11:11:51] [INFO] Health check passed.
+[2026-07-05 11:11:51] [ERROR] License verification failed on first run: Invalid license key.
+[2026-07-05 11:12:26] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-SEPQ-A6IX-RFG8-MB7S HTTP=200
+[2026-07-05 11:12:26] [INFO] Health check passed.
+[2026-07-05 11:12:26] [INFO] First valid license stored. Update check will run on next execution.
+[2026-07-05 11:12:32] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-SEPQ-A6IX-RFG8-MB7S HTTP=200
+[2026-07-05 11:12:32] [INFO] Health check passed.
+[2026-07-05 11:12:33] [ERROR] Update check request failed.
+[2026-07-05 11:13:35] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-SEPQ-A6IX-RFG8-MB7S HTTP=200
+[2026-07-05 11:13:35] [INFO] Health check passed.
+[2026-07-05 11:13:35] [WARN] Update check completed: Support/upgrade service is inactive. Please pay service invoice.
+[2026-07-05 11:18:33] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-SEPQ-A6IX-RFG8-MB7S HTTP=200
+[2026-07-05 11:18:33] [INFO] Health check passed.
+[2026-07-05 11:18:33] [ERROR] Update check request failed.
+[2026-07-05 11:18:39] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-SEPQ-A6IX-RFG8-MB7S HTTP=200
+[2026-07-05 11:18:39] [INFO] Health check passed.
+[2026-07-05 11:18:39] [ERROR] Update check request failed.
+[2026-07-05 11:26:25] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-GX6W-ELJS-JZDR-QHMZ HTTP=200
+[2026-07-05 11:26:25] [INFO] Health check passed.
+[2026-07-05 11:26:25] [WARN] Update available: 0.0.0 -> 1
+[2026-07-05 11:26:25] [INFO] Updater bootstrap completed successfully.
+[2026-07-05 11:26:48] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-GX6W-ELJS-JZDR-QHMZ HTTP=200
+[2026-07-05 11:26:48] [INFO] Health check passed.
+[2026-07-05 11:26:48] [INFO] First valid license stored. Update check will run on next execution.
+[2026-07-05 11:26:53] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-GX6W-ELJS-JZDR-QHMZ HTTP=200
+[2026-07-05 11:26:53] [INFO] Health check passed.
+[2026-07-05 11:26:53] [WARN] Update available: 0.0.0 -> 1
+[2026-07-05 11:26:53] [INFO] Updater bootstrap completed successfully.
+[2026-07-05 11:27:07] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-GX6W-ELJS-JZDR-QHMZ HTTP=200
+[2026-07-05 11:27:07] [INFO] Health check passed.
+[2026-07-05 11:27:07] [WARN] Update available: 0.0.0 -> 1
+[2026-07-05 11:27:07] [INFO] Updater bootstrap completed successfully.
+[2026-07-05 11:32:02] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-GX6W-ELJS-JZDR-QHMZ HTTP=200
+[2026-07-05 11:32:02] [INFO] Health check passed.
+[2026-07-05 11:32:02] [WARN] Update available: 0.0.0 -> 1
+[2026-07-05 11:32:02] [INFO] Run with --download-update to fetch the package in chunks.
+[2026-07-05 11:32:02] [INFO] Updater bootstrap completed successfully.
+[2026-07-05 11:33:24] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-GX6W-ELJS-JZDR-QHMZ HTTP=200
+[2026-07-05 11:33:24] [INFO] Health check passed.
+[2026-07-05 11:33:24] [WARN] Update available: 0.0.0 -> 1
+[2026-07-05 11:33:24] [INFO] Run with --download-update to fetch the package in chunks.
+[2026-07-05 11:33:24] [INFO] Updater bootstrap completed successfully.
+[2026-07-05 11:34:06] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-GX6W-ELJS-JZDR-QHMZ HTTP=200
+[2026-07-05 11:34:06] [INFO] Health check passed.
+[2026-07-05 11:34:06] [WARN] Update available: 0.0.0 -> 1
+[2026-07-05 11:34:06] [INFO] Starting chunked download: https://system.likesoftbd.com/storage/version-files/obBvCntpmKsDug4D8du9otwYzRxb4eSDw65HTl5n.zip
+[2026-07-05 11:34:08] [INFO] Download progress: 100.00% (1/1 chunks)
+[2026-07-05 11:34:08] [INFO] Chunked download completed: D:\wamp64\www\updater\system_monitoring/../update_data/downloads\download-20260705113406-fdc2beb7\update-1.zip
+[2026-07-05 11:34:23] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-GX6W-ELJS-JZDR-QHMZ HTTP=200
+[2026-07-05 11:34:23] [INFO] Health check passed.
+[2026-07-05 11:34:24] [WARN] Update available: 0.0.0 -> 1
+[2026-07-05 11:34:24] [INFO] Starting chunked download: https://system.likesoftbd.com/storage/version-files/obBvCntpmKsDug4D8du9otwYzRxb4eSDw65HTl5n.zip
+[2026-07-05 11:34:25] [INFO] Download progress: 100.00% (1/1 chunks)
+[2026-07-05 11:34:25] [INFO] Chunked download completed: D:\wamp64\www\updater\system_monitoring/../update_data/downloads\download-20260705113424-c47a47a2\update-1.zip
+[2026-07-05 11:40:24] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-GX6W-ELJS-JZDR-QHMZ HTTP=200
+[2026-07-05 11:40:24] [INFO] Health check passed.
+[2026-07-05 11:40:24] [WARN] Update available: 0.0.0 -> 1
+[2026-07-05 11:40:24] [INFO] Starting chunked download: https://system.likesoftbd.com/storage/version-files/obBvCntpmKsDug4D8du9otwYzRxb4eSDw65HTl5n.zip
+[2026-07-05 11:40:25] [INFO] Download progress: 100.00% (1/1 chunks)
+[2026-07-05 11:40:25] [INFO] Chunked download completed: D:\wamp64\www\updater\system_monitoring/../update_data/downloads\download-20260705114024-b12815d6\update-1.zip
+[2026-07-05 11:42:34] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-GX6W-ELJS-JZDR-QHMZ HTTP=200
+[2026-07-05 11:42:34] [INFO] Health check passed.
+[2026-07-05 11:42:34] [WARN] Update available: 0.0.0 -> 1
+[2026-07-05 11:42:34] [INFO] Starting chunked download: https://system.likesoftbd.com/storage/version-files/obBvCntpmKsDug4D8du9otwYzRxb4eSDw65HTl5n.zip
+[2026-07-05 11:42:35] [INFO] Download progress: 100.00% (1/1 chunks)
+[2026-07-05 11:42:35] [INFO] Chunked download completed: D:\wamp64\www\updater\system_monitoring/../update_data/downloads\download-20260705114234-cc0d50c6\update-1.zip
+[2026-07-05 11:43:18] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-GX6W-ELJS-JZDR-QHMZ HTTP=200
+[2026-07-05 11:43:18] [INFO] Health check passed.
+[2026-07-05 11:43:18] [WARN] Update available: 0.0.0 -> 1
+[2026-07-05 11:43:18] [INFO] Starting chunked download: https://system.likesoftbd.com/storage/version-files/obBvCntpmKsDug4D8du9otwYzRxb4eSDw65HTl5n.zip
+[2026-07-05 11:43:19] [INFO] Download progress: 100.00% (1/1 chunks)
+[2026-07-05 11:43:19] [INFO] Chunked download completed: D:\wamp64\www\updater\system_monitoring/../update_data/downloads\download-20260705114318-5b9740b2\update-1.zip
+[2026-07-05 11:43:19] [ERROR] Apply failed: Update target root is not configured.
+[2026-07-05 11:44:26] [INFO] Ping OK. URL=http://system.localhost/api/system_monitoring/ping?software=testproject&license=LIC-GX6W-ELJS-JZDR-QHMZ HTTP=200
+[2026-07-05 11:44:26] [INFO] Health check passed.
+[2026-07-05 11:44:26] [WARN] Update available: 0.0.0 -> 1
+[2026-07-05 11:44:26] [INFO] Starting chunked download: https://system.likesoftbd.com/storage/version-files/obBvCntpmKsDug4D8du9otwYzRxb4eSDw65HTl5n.zip
+[2026-07-05 11:57:20] [INFO] Bootstrap started. software_id=testproject current_version=0.0.0 manual=false download=false
+[2026-07-05 11:57:20] [INFO] Health check passed.
+[2026-07-05 11:57:20] [WARN] Update available. from=0.0.0 to=1
+[2026-07-05 11:57:39] [INFO] Bootstrap started. software_id=testproject current_version=0.0.0 manual=false download=false
+[2026-07-05 11:57:39] [INFO] Health check passed.
+[2026-07-05 11:57:39] [WARN] Update available. from=0.0.0 to=1
+[2026-07-05 11:57:39] [INFO] Starting chunked download. url=https://system.likesoftbd.com/storage/version-files/obBvCntpmKsDug4D8du9otwYzRxb4eSDw65HTl5n.zip job_id=download-20260705115739-dff212f1 chunks=1 chunk_size=1048576
+[2026-07-05 11:57:40] [INFO] Download progress. chunk=1 total_chunks=1 percent=100 downloaded_bytes=0 total_size=0
+[2026-07-05 11:57:40] [INFO] Chunked download completed. job_id=download-20260705115739-dff212f1 package_path=D:\wamp64\www\updater\update_data\downloads\download-20260705115739-dff212f1\update-1.zip
+[2026-07-05 11:57:40] [WARN] Apply skipped or failed. message=Update target root is not configured.
+[2026-07-05 11:58:30] [INFO] Bootstrap started. software_id=testproject current_version=0.0.0 manual=false download=false
+[2026-07-05 11:58:31] [INFO] Health check passed.
+[2026-07-05 11:58:31] [WARN] Update available. from=0.0.0 to=1
+[2026-07-05 11:58:31] [INFO] Starting chunked download. url=https://system.likesoftbd.com/storage/version-files/obBvCntpmKsDug4D8du9otwYzRxb4eSDw65HTl5n.zip job_id=download-20260705115831-4508577b chunks=1 chunk_size=1048576
+[2026-07-05 11:58:31] [INFO] Download progress. chunk=1 total_chunks=1 percent=0 downloaded_bytes=0 total_size=316
+[2026-07-05 11:58:31] [INFO] Chunked download completed. job_id=download-20260705115831-4508577b package_path=D:\wamp64\www\updater\update_data\downloads\download-20260705115831-4508577b\update-1.zip
+[2026-07-05 11:58:31] [WARN] Apply skipped or failed. message=Update target root is not configured.
+[2026-07-05 11:59:00] [INFO] Bootstrap started. software_id=testproject current_version=0.0.0 manual=false download=false
+[2026-07-05 11:59:00] [INFO] Health check passed.
+[2026-07-05 11:59:00] [WARN] Update available. from=0.0.0 to=1
+[2026-07-05 11:59:00] [INFO] Starting chunked download. url=https://system.likesoftbd.com/storage/version-files/obBvCntpmKsDug4D8du9otwYzRxb4eSDw65HTl5n.zip job_id=download-20260705115900-3ef6ec9b chunks=1 chunk_size=1048576
+[2026-07-05 11:59:01] [INFO] Download progress. chunk=1 total_chunks=1 percent=100 downloaded_bytes=316 total_size=316
+[2026-07-05 11:59:01] [INFO] Chunked download completed. job_id=download-20260705115900-3ef6ec9b package_path=D:\wamp64\www\updater\update_data\downloads\download-20260705115900-3ef6ec9b\update-1.zip
+[2026-07-05 11:59:01] [WARN] Apply skipped or failed. message=Update target root is not configured.
+[2026-07-05 11:59:40] [INFO] Bootstrap started. software_id=testproject current_version=0.0.0 manual=false download=false
+[2026-07-05 11:59:40] [INFO] Health check passed.
+[2026-07-05 11:59:41] [WARN] Update available. from=0.0.0 to=1
+[2026-07-05 11:59:41] [INFO] Starting chunked download. url=https://system.likesoftbd.com/storage/version-files/obBvCntpmKsDug4D8du9otwYzRxb4eSDw65HTl5n.zip job_id=download-20260705115941-1889d26a chunks=1 chunk_size=1048576
+[2026-07-05 11:59:41] [INFO] Download progress. chunk=1 total_chunks=1 percent=100 downloaded_bytes=316 total_size=316
+[2026-07-05 11:59:41] [INFO] Chunked download completed. job_id=download-20260705115941-1889d26a package_path=D:\wamp64\www\updater\update_data\downloads\download-20260705115941-1889d26a\update-1.zip
+[2026-07-05 11:59:42] [INFO] Update applied with replace-only sync. package_path=D:\wamp64\www\updater\update_data\downloads\download-20260705115941-1889d26a\update-1.zip target_root=D:\wamp64\www\updater copied_files=1
+[2026-07-05 11:59:42] [INFO] Update cycle finished successfully. package_path=D:\wamp64\www\updater\update_data\downloads\download-20260705115941-1889d26a\update-1.zip target_root=D:\wamp64\www\updater

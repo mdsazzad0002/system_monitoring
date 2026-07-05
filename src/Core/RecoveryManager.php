@@ -1,19 +1,43 @@
 <?php
 
+declare(strict_types=1);
+
 namespace SystemMonitoring\Core;
 
 use SystemMonitoring\Network\RecoveryClient;
+use SystemMonitoring\Support\MonitorLogger;
+use SystemMonitoring\Support\UpdateState;
 
-class RecoveryManager
+final class RecoveryManager
 {
-    public static function recover()
-    {
-        $config = require __DIR__ . '/../../config.php';
+    public function __construct(
+        private readonly RecoveryClient $recoveryClient,
+        private readonly MonitorLogger $logger,
+        private array &$state
+    ) {
+    }
 
-        if (!$config['auto_recovery']) {
-            return;
+    public function recover(array $context = []): array
+    {
+        $this->logger->warn('Recovery flow started.', $context);
+
+        $result = $this->recoveryClient->recover($context);
+
+        $this->state['last_recovery_at'] = gmdate('c');
+        $this->state['last_recovery_status'] = $result['ok'] ?? false;
+        UpdateState::appendHistory($this->state, 'recovery', [
+            'status' => $result['ok'] ?? false,
+            'message' => $result['message'] ?? null,
+        ]);
+
+        if ($result['ok'] ?? false) {
+            $this->logger->info('Recovery request completed.');
+        } else {
+            $this->logger->warn('Recovery request skipped or failed.', [
+                'message' => $result['message'] ?? 'Unknown',
+            ]);
         }
 
-        RecoveryClient::trigger($config['restore_url']);
+        return $result;
     }
 }
