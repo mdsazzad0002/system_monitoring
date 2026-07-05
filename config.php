@@ -34,6 +34,11 @@ if (! function_exists('system_monitoring_config')) {
             ? system_monitoring_resolve_path($targetRoot, $projectRoot)
             : $projectRoot;
 
+        $updateMode = strtolower(system_monitoring_env_value($env, ['update_mode', 'version_type']) ?? 'partial');
+        if (! in_array($updateMode, ['full', 'partial'], true)) {
+            $updateMode = 'partial';
+        }
+
         $recoveryUrl = system_monitoring_env_value($env, ['recovery_url']);
 
         $config = [
@@ -42,10 +47,12 @@ if (! function_exists('system_monitoring_config')) {
             'log_file' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring' . DIRECTORY_SEPARATOR . 'system_monitoring.log',
             'state_file' => $projectRoot . DIRECTORY_SEPARATOR . 'update_data' . DIRECTORY_SEPARATOR . 'updater.json',
             'download_root' => $projectRoot . DIRECTORY_SEPARATOR . 'update_data' . DIRECTORY_SEPARATOR . 'downloads',
+            'backup_root' => $projectRoot . DIRECTORY_SEPARATOR . 'update_data' . DIRECTORY_SEPARATOR . 'backups',
             'software_id' => $softwareId,
             'license' => $license,
             'target_host' => $targetHost,
             'current_version' => $currentVersion,
+            'update_mode' => $updateMode,
             'ping_url' => $targetHost !== '' ? $targetHost . '/api/system_monitoring/ping' : '',
             'verify_license_url' => $targetHost !== '' ? $targetHost . '/api/system_monitoring/verify-license' : '',
             'check_update_url' => $targetHost !== '' ? $targetHost . '/api/system_monitoring/update/check' : '',

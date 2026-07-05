@@ -8,6 +8,8 @@ It is designed to:
 - ping the server
 - verify the license on first run
 - check updates on later runs
+- detect `full` or `partial` version type
+- create a pre-update JSON backup of `.env` and database settings
 - download update packages in chunks
 - reuse the same version package if it is already present
 - merge and apply updates with replace-only sync
@@ -42,6 +44,7 @@ softwareid="testproject"
 currentversion="0.0.0"
 auto_recovery=true
 auto_download_update=true
+update_mode=partial
 update_target_root="D:/path/to/your/project"
 ```
 
@@ -53,6 +56,7 @@ update_target_root="D:/path/to/your/project"
 - `currentversion` - local installed version
 - `auto_recovery` - run recovery flow when ping fails
 - `auto_download_update` - automatically download and apply updates when found
+- `update_mode` - `partial` or `full`, used when the server does not send a version type
 - `update_target_root` - where extracted files are copied
 - `download_chunk_size` - size of each chunk in bytes
 - `download_timeout` - timeout used for each download request
@@ -95,6 +99,7 @@ It keeps:
 - last update check result
 - download progress
 - last applied package
+- last backup metadata
 - history events
 
 ## Notes

@@ -144,3 +144,32 @@
 [2026-07-05 12:06:56] [INFO] Chunked download completed. job_id=download-20260705120655-b0275b5d package_path=D:\wamp64\www\updater\update_data\downloads\1\update.zip
 [2026-07-05 12:06:56] [INFO] Update applied with replace-only sync. package_path=D:\wamp64\www\updater\update_data\downloads\1\update.zip target_root=D:\wamp64\www\updater copied_files=1 version=1
 [2026-07-05 12:06:56] [INFO] Update cycle finished successfully. package_path=D:\wamp64\www\updater\update_data\downloads\1\update.zip target_root=D:\wamp64\www\updater current_version=1
+[2026-07-05 12:07:35] [INFO] Bootstrap started. software_id=testproject current_version=1 manual=false download=false
+[2026-07-05 12:07:35] [INFO] Health check passed.
+[2026-07-05 12:07:35] [INFO] No update available. current_version=1 latest_version=1
+[2026-07-05 12:09:22] [INFO] Bootstrap started. software_id=testproject current_version=1 manual=false download=false
+[2026-07-05 12:09:22] [INFO] Health check passed.
+[2026-07-05 12:09:23] [WARN] Update available. from=1 to=2
+[2026-07-05 12:09:23] [INFO] Starting chunked download. url=https://system.likesoftbd.com/storage/version-files/aAWD6QXVMCgfeHwihWlB40x76ZbhW83khaJVuYwv.zip job_id=download-20260705120923-856b5103 version=2 chunks=1 chunk_size=1048576
+[2026-07-05 12:09:24] [INFO] Download progress. chunk=1 total_chunks=1 percent=100 downloaded_bytes=385413 total_size=385413
+[2026-07-05 12:09:24] [INFO] Chunked download completed. job_id=download-20260705120923-856b5103 package_path=D:\wamp64\www\updater\update_data\downloads\2\update.zip
+[2026-07-05 12:09:24] [INFO] Update applied with replace-only sync. package_path=D:\wamp64\www\updater\update_data\downloads\2\update.zip target_root=D:\wamp64\www\updater copied_files=15 version=2
+[2026-07-05 12:09:24] [INFO] Update cycle finished successfully. package_path=D:\wamp64\www\updater\update_data\downloads\2\update.zip target_root=D:\wamp64\www\updater current_version=2
+[2026-07-05 12:10:49] [INFO] Bootstrap started. software_id=testproject current_version=2 manual=false download=false
+[2026-07-05 12:10:49] [INFO] Health check passed.
+[2026-07-05 12:10:49] [INFO] No update available. current_version=2 latest_version=2
+[2026-07-05 12:12:37] [INFO] Bootstrap started. software_id=testproject current_version=2 manual=false download=false
+[2026-07-05 12:12:37] [INFO] Health check passed.
+[2026-07-05 12:12:37] [INFO] No update available. current_version=2 latest_version=2
+[2026-07-05 12:18:11] [INFO] Bootstrap started. software_id=testproject current_version=2 manual=false download=false
+[2026-07-05 12:18:11] [INFO] Health check passed.
+[2026-07-05 12:18:12] [INFO] No update available. current_version=2 latest_version=2
+[2026-07-05 12:22:25] [INFO] Bootstrap started. software_id=testproject current_version=2 manual=false download=false
+[2026-07-05 12:22:25] [INFO] Health check passed.
+[2026-07-05 12:22:26] [WARN] Update available. from=2 to=3 version_type=partial
+[2026-07-05 12:22:26] [INFO] Pre-update backup created. backup_directory=D:\wamp64\www\updater\update_data\backups\3\partial\20260705122226 backup_json=D:\wamp64\www\updater\update_data\backups\3\partial\20260705122226\backup.json version_type=partial target_version=3
+[2026-07-05 12:22:26] [INFO] Starting chunked download. url=https://system.likesoftbd.com/storage/version-files/W5buZyUdkVptmYQoObq0PxxzOndm06w2JKtJzOFA.zip job_id=download-20260705122226-5c01c6c0 version=3 chunks=1 chunk_size=1048576
+[2026-07-05 12:22:27] [INFO] Download progress. chunk=1 total_chunks=1 percent=100 downloaded_bytes=573104 total_size=573104
+[2026-07-05 12:22:27] [INFO] Chunked download completed. job_id=download-20260705122226-5c01c6c0 package_path=D:\wamp64\www\updater\update_data\downloads\3\update.zip
+[2026-07-05 12:22:27] [INFO] Update applied with replace-only sync. package_path=D:\wamp64\www\updater\update_data\downloads\3\update.zip target_root=D:\wamp64\www\updater copied_files=69 version=3
+[2026-07-05 12:22:27] [INFO] Update cycle finished successfully. package_path=D:\wamp64\www\updater\update_data\downloads\3\update.zip target_root=D:\wamp64\www\updater current_version=3

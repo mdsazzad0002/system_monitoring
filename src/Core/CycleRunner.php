@@ -11,6 +11,7 @@ use SystemMonitoring\Network\UpdateApplyClient;
 use SystemMonitoring\Network\UpdateDownloadClient;
 use SystemMonitoring\Network\VerifyLicenseClient;
 use SystemMonitoring\Support\HttpClient;
+use SystemMonitoring\Support\BackupSnapshot;
 use SystemMonitoring\Support\MonitorLogger;
 use SystemMonitoring\Support\UpdateState;
 
@@ -149,15 +150,21 @@ final class CycleRunner
 
         $response = $updateCheck['json'] ?? [];
         $updateAvailable = (bool) ($response['update_available'] ?? false);
+        $versionType = strtolower((string) ($response['version_type'] ?? $response['update_type'] ?? $config['update_mode']));
+        if (! in_array($versionType, ['full', 'partial'], true)) {
+            $versionType = $config['update_mode'];
+        }
         $state['last_update_available'] = $updateAvailable;
         $state['last_known_version'] = $response['latest_version'] ?? null;
         $state['last_update_from'] = $currentVersion;
         $state['last_update_to'] = $response['latest_version'] ?? $currentVersion;
+        $state['last_update_mode'] = $versionType;
 
         if (! $updateAvailable) {
             $logger->info('No update available.', [
                 'current_version' => $currentVersion,
                 'latest_version' => $response['latest_version'] ?? null,
+                'version_type' => $versionType,
             ]);
             return 0;
         }
@@ -165,12 +172,35 @@ final class CycleRunner
         $logger->warn('Update available.', [
             'from' => $currentVersion,
             'to' => $response['latest_version'] ?? null,
+            'version_type' => $response['version_type'] ?? $response['update_type'] ?? $config['update_mode'],
         ]);
 
         if (! ($config['auto_download_update'] ?? false) && ! $downloadRequested) {
             $logger->info('Auto download is disabled. Update was only checked.');
             return 0;
         }
+
+        $backupResult = BackupSnapshot::create($config, array_merge($response, [
+            'version_type' => $response['version_type'] ?? $response['update_type'] ?? $config['update_mode'],
+        ]), $state);
+        $state['last_backup_at'] = gmdate('c');
+        $state['last_backup_directory'] = $backupResult['backup_directory'] ?? null;
+        $state['last_backup_json'] = $backupResult['backup_json'] ?? null;
+        $state['last_backup_version'] = $backupResult['target_version'] ?? null;
+        $state['last_backup_mode'] = $backupResult['version_type'] ?? null;
+        UpdateState::appendHistory($state, 'backup_created', [
+            'backup_directory' => $backupResult['backup_directory'] ?? null,
+            'backup_json' => $backupResult['backup_json'] ?? null,
+            'version_type' => $backupResult['version_type'] ?? null,
+            'target_version' => $backupResult['target_version'] ?? null,
+        ]);
+
+        $logger->info('Pre-update backup created.', [
+            'backup_directory' => $backupResult['backup_directory'] ?? null,
+            'backup_json' => $backupResult['backup_json'] ?? null,
+            'version_type' => $backupResult['version_type'] ?? null,
+            'target_version' => $backupResult['target_version'] ?? null,
+        ]);
 
         $downloadClient = new UpdateDownloadClient($http, $config, $logger, $state);
         $downloadResult = $downloadClient->download($response);
