@@ -6,9 +6,12 @@ namespace SystemMonitoring\Support;
 
 final class MonitorLogger
 {
+    private string $resolvedLogFile;
+
     public function __construct(
         private readonly string $logFile
     ) {
+        $this->resolvedLogFile = $this->resolveLogFile($logFile);
     }
 
     public function info(string $message, array $context = []): void
@@ -46,8 +49,33 @@ final class MonitorLogger
             @mkdir($directory, 0777, true);
         }
 
-        @file_put_contents($this->logFile, $line . PHP_EOL, FILE_APPEND | LOCK_EX);
+        $directory = dirname($this->resolvedLogFile);
+        if (! is_dir($directory)) {
+            @mkdir($directory, 0777, true);
+        }
+
+        @file_put_contents($this->resolvedLogFile, $line . PHP_EOL, FILE_APPEND | LOCK_EX);
         echo $line . PHP_EOL;
+    }
+
+    public function currentLogFile(): string
+    {
+        return $this->resolvedLogFile;
+    }
+
+    private function resolveLogFile(string $logFile): string
+    {
+        $directory = dirname($logFile);
+        $filename = pathinfo($logFile, PATHINFO_FILENAME);
+        $extension = pathinfo($logFile, PATHINFO_EXTENSION);
+        $dateSegment = gmdate('Y-m-d');
+
+        $resolvedName = $filename . '-' . $dateSegment;
+        if ($extension !== '') {
+            $resolvedName .= '.' . $extension;
+        }
+
+        return rtrim($directory, "\\/") . DIRECTORY_SEPARATOR . $resolvedName;
     }
 
     private function formatContext(array $context): string

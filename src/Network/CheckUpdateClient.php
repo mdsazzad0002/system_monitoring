@@ -28,6 +28,8 @@ final class CheckUpdateClient
             'software' => $this->config['software_id'] ?? '',
             'version' => $version,
             'license_key' => $this->config['license'] ?? '',
+            'device_id' => $this->config['device_id'] ?? '',
+            'domain' => $this->config['request_domain'] ?? '',
         ];
 
         $response = $this->http->request('POST', $this->config['check_update_url'], [

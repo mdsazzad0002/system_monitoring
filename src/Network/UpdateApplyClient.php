@@ -213,5 +213,40 @@ final class UpdateApplyClient
         if (is_dir($chunksDirectory)) {
             $this->deleteDirectory($chunksDirectory);
         }
+
+        $versionRoot = dirname($packagePath);
+        $downloadRoot = (string) ($this->config['download_root'] ?? '');
+
+        if ($downloadRoot !== '') {
+            $this->pruneEmptyParents($versionRoot, $downloadRoot);
+        }
+    }
+
+    private function pruneEmptyParents(string $directory, string $stopAt): void
+    {
+        $directory = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $directory), "\\/");
+        $stopAt = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $stopAt), "\\/");
+
+        while ($directory !== '' && $directory !== $stopAt) {
+            if (! is_dir($directory)) {
+                $directory = dirname($directory);
+                continue;
+            }
+
+            $items = array_values(array_diff(scandir($directory) ?: [], ['.', '..']));
+            if ($items !== []) {
+                break;
+            }
+
+            @rmdir($directory);
+            $directory = dirname($directory);
+        }
+
+        if ($directory === $stopAt && is_dir($directory)) {
+            $items = array_values(array_diff(scandir($directory) ?: [], ['.', '..']));
+            if ($items === []) {
+                @rmdir($directory);
+            }
+        }
     }
 }

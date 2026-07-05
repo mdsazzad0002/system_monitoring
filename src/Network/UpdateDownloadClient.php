@@ -74,6 +74,7 @@ final class UpdateDownloadClient
             'url' => $downloadUrl,
             'job_id' => $jobId,
             'version' => $version,
+            'device_id' => $this->config['device_id'] ?? null,
             'chunks' => $totalChunks,
             'chunk_size' => $chunkSize,
         ]);

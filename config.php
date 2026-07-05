@@ -13,11 +13,25 @@ if (! function_exists('system_monitoring_config')) {
 
         $projectRoot = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
         $env = system_monitoring_load_env($projectRoot . DIRECTORY_SEPARATOR . '.env');
+        $fallbackEnv = system_monitoring_load_env($projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . '.env');
+        $instanceConfig = system_monitoring_load_instance_config($projectRoot);
+
+        if ($instanceConfig !== []) {
+            $env = array_merge($instanceConfig, $env);
+        }
+
+        if ($fallbackEnv !== []) {
+            $env = array_merge($fallbackEnv, $env);
+        }
 
         $softwareId = system_monitoring_env_value($env, ['softwareid', 'software_id', 'software']) ?? 'default';
         $license = system_monitoring_env_value($env, ['license', 'license_key']) ?? '';
-        $targetHost = rtrim(system_monitoring_env_value($env, ['targethost', 'target_host']) ?? '', '/');
+        $licenseRequired = system_monitoring_env_bool($env, ['license_required'], true);
+        $allowUnlicensed = system_monitoring_env_bool($env, ['allow_unlicensed', 'developer_mode'], false);
+        $targetHost = rtrim(\SystemMonitoring\Support\IdentityContext::resolveTargetHost($env, $projectRoot), '/');
         $currentVersion = system_monitoring_env_value($env, ['currentversion', 'current_version']) ?? '0.0.0';
+        $deviceId = system_monitoring_detect_device_id($env);
+        $requestDomain = \SystemMonitoring\Support\IdentityContext::normalizeDomain($targetHost);
 
         $downloadChunkSize = (int) (system_monitoring_env_value($env, ['download_chunk_size']) ?? 1048576);
         if ($downloadChunkSize < 65536) {
@@ -40,26 +54,64 @@ if (! function_exists('system_monitoring_config')) {
         }
 
         $recoveryUrl = system_monitoring_env_value($env, ['recovery_url']);
+        $databaseBackupTimes = system_monitoring_env_value($env, ['database_backup_times']) ?? '00:00,12:00';
+        $databaseBackupRetryMinutes = (int) (system_monitoring_env_value($env, ['database_backup_retry_minutes']) ?? 30);
+        if ($databaseBackupRetryMinutes < 1) {
+            $databaseBackupRetryMinutes = 1;
+        }
+
+        $databaseBackupChunkSize = (int) (system_monitoring_env_value($env, ['database_backup_chunk_size']) ?? 2097152);
+        if ($databaseBackupChunkSize < 65536) {
+            $databaseBackupChunkSize = 65536;
+        }
+
+        $databaseBackupTimeout = (int) (system_monitoring_env_value($env, ['database_backup_timeout']) ?? 60);
+        if ($databaseBackupTimeout < 5) {
+            $databaseBackupTimeout = 5;
+        }
+
+        $databaseBackupRoot = system_monitoring_env_value($env, ['database_backup_root', 'backup_temp_root']);
+        $databaseBackupRoot = $databaseBackupRoot !== null && $databaseBackupRoot !== ''
+            ? system_monitoring_resolve_path($databaseBackupRoot, $projectRoot)
+            : $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'database_backups';
 
         $config = [
             'project_root' => $projectRoot,
             'env_path' => $projectRoot . DIRECTORY_SEPARATOR . '.env',
+            'instance_config_path' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring.instance.php',
+            'instance_runtime_path' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'system_monitoring.instance.php',
             'log_file' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring' . DIRECTORY_SEPARATOR . 'system_monitoring.log',
-            'state_file' => $projectRoot . DIRECTORY_SEPARATOR . 'update_data' . DIRECTORY_SEPARATOR . 'updater.json',
-            'download_root' => $projectRoot . DIRECTORY_SEPARATOR . 'update_data' . DIRECTORY_SEPARATOR . 'downloads',
-            'backup_root' => $projectRoot . DIRECTORY_SEPARATOR . 'update_data' . DIRECTORY_SEPARATOR . 'backups',
+            'state_file' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'updater.json',
+            'download_root' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'downloads',
+            'backup_root' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'backups',
             'software_id' => $softwareId,
             'license' => $license,
+            'license_required' => $licenseRequired,
+            'allow_unlicensed' => $allowUnlicensed,
+            'device_id' => $deviceId,
             'target_host' => $targetHost,
+            'request_domain' => $requestDomain,
             'current_version' => $currentVersion,
             'update_mode' => $updateMode,
             'ping_url' => $targetHost !== '' ? $targetHost . '/api/system_monitoring/ping' : '',
-            'verify_license_url' => $targetHost !== '' ? $targetHost . '/api/system_monitoring/verify-license' : '',
+            'verify_license_url' => $targetHost !== '' ? $targetHost . '/api/verify-license' : '',
             'check_update_url' => $targetHost !== '' ? $targetHost . '/api/system_monitoring/update/check' : '',
+            'backup_api_base_url' => $targetHost !== '' ? $targetHost . '/api' : '',
+            'backup_ping_url' => $targetHost !== '' ? $targetHost . '/api/ping' : '',
+            'backup_initialize_url' => $targetHost !== '' ? $targetHost . '/api/backup/initialize' : '',
+            'backup_chunk_url' => $targetHost !== '' ? $targetHost . '/api/backup/chunk' : '',
+            'backup_complete_url' => $targetHost !== '' ? $targetHost . '/api/backup/complete' : '',
             'recovery_url' => $targetHost !== '' && $recoveryUrl ? rtrim($recoveryUrl, '/') : '',
             'update_target_root' => $targetRoot,
             'auto_recovery' => system_monitoring_env_bool($env, ['auto_recovery'], true),
             'auto_download_update' => system_monitoring_env_bool($env, ['auto_download_update'], true),
+            'auto_database_backup' => system_monitoring_env_bool($env, ['auto_database_backup', 'auto_backup'], true),
+            'database_backup_times' => $databaseBackupTimes,
+            'database_backup_retry_minutes' => $databaseBackupRetryMinutes,
+            'database_backup_chunk_size' => $databaseBackupChunkSize,
+            'database_backup_timeout' => $databaseBackupTimeout,
+            'database_backup_root' => $databaseBackupRoot,
+            'database_backup_keep_local' => system_monitoring_env_bool($env, ['database_backup_keep_local'], false),
             'allow_self_update' => system_monitoring_env_bool($env, ['allow_self_update'], false),
             'download_chunk_size' => $downloadChunkSize,
             'download_timeout' => $downloadTimeout,
@@ -106,6 +158,47 @@ if (! function_exists('system_monitoring_config')) {
         return $result;
     }
 
+    function system_monitoring_load_instance_config(string $projectRoot): array
+    {
+        $paths = [
+            $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring.instance.php',
+            $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'system_monitoring.instance.php',
+        ];
+
+        $merged = [];
+
+        foreach ($paths as $path) {
+            if (! is_file($path)) {
+                continue;
+            }
+
+            $data = include $path;
+            if (! is_array($data)) {
+                continue;
+            }
+
+            $merged = array_merge($merged, $data);
+        }
+
+        if ($merged === []) {
+            return [];
+        }
+
+        $profile = system_monitoring_env_value($merged, ['SYSTEM_MONITORING_PROFILE', 'system_monitoring_profile', 'profile']) ?? 'windows_local';
+        $profiles = $merged['profiles'] ?? [];
+        $selectedProfile = is_array($profiles) && isset($profiles[$profile]) && is_array($profiles[$profile])
+            ? $profiles[$profile]
+            : [];
+
+        unset($merged['profiles'], $merged['profile']);
+
+        if ($selectedProfile !== []) {
+            $merged = array_merge($merged, $selectedProfile);
+        }
+
+        return $merged;
+    }
+
     function system_monitoring_env_value(array $env, array $keys): ?string
     {
         foreach ($keys as $key) {
@@ -141,5 +234,77 @@ if (! function_exists('system_monitoring_config')) {
         }
 
         return rtrim($basePath, "\\/") . DIRECTORY_SEPARATOR . ltrim($normalized, "\\/");
+    }
+
+    function system_monitoring_detect_device_id(array $env): string
+    {
+        $override = system_monitoring_env_value($env, ['device_id', 'device_fingerprint']);
+        if ($override !== null) {
+            return strtoupper(trim($override));
+        }
+
+        $parts = [];
+
+        $hostname = gethostname();
+        if (is_string($hostname) && $hostname !== '') {
+            $parts[] = $hostname;
+        }
+
+        $computerName = getenv('COMPUTERNAME');
+        if (is_string($computerName) && $computerName !== '') {
+            $parts[] = $computerName;
+        }
+
+        $parts[] = php_uname('n');
+        $parts[] = php_uname('s') . '|' . php_uname('r') . '|' . php_uname('m');
+
+        $macAddresses = system_monitoring_collect_mac_addresses();
+        foreach ($macAddresses as $macAddress) {
+            $parts[] = $macAddress;
+        }
+
+        $source = implode('|', array_values(array_filter($parts, fn ($value) => is_string($value) && trim($value) !== '')));
+        if ($source === '') {
+            $source = (string) microtime(true);
+        }
+
+        return 'DEV-' . strtoupper(substr(hash('sha256', $source), 0, 24));
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    function system_monitoring_collect_mac_addresses(): array
+    {
+        $addresses = [];
+
+        $commands = ['getmac /fo csv /nh'];
+
+        if (system_monitoring_has_command('wmic')) {
+            $commands[] = 'wmic nic where NetEnabled=true get MACAddress /value';
+        }
+
+        foreach ($commands as $command) {
+            $output = @shell_exec($command);
+            if (! is_string($output) || trim($output) === '') {
+                continue;
+            }
+
+            if (preg_match_all('/([0-9A-F]{2}(?:[-:][0-9A-F]{2}){5})/i', $output, $matches) === 1) {
+                foreach ($matches[1] as $match) {
+                    $normalized = strtoupper(str_replace('-', ':', trim($match)));
+                    $addresses[$normalized] = $normalized;
+                }
+            }
+        }
+
+        return array_values($addresses);
+    }
+
+    function system_monitoring_has_command(string $command): bool
+    {
+        $output = @shell_exec('where ' . $command . ' 2>NUL');
+
+        return is_string($output) && trim($output) !== '';
     }
 }

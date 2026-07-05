@@ -27,6 +27,8 @@ final class VerifyLicenseClient
         $payload = [
             'software' => $this->config['software_id'] ?? '',
             'license_key' => $this->config['license'] ?? '',
+            'device_id' => $this->config['device_id'] ?? '',
+            'domain' => $this->config['request_domain'] ?? '',
         ];
 
         $response = $this->http->request('POST', $this->config['verify_license_url'], [

@@ -29,6 +29,8 @@ final class RecoveryClient
         $payload = array_merge([
             'software' => $this->config['software_id'] ?? '',
             'license_key' => $this->config['license'] ?? '',
+            'device_id' => $this->config['device_id'] ?? '',
+            'domain' => $this->config['request_domain'] ?? '',
         ], $context);
 
         $response = $this->http->request('POST', $recoveryUrl, [

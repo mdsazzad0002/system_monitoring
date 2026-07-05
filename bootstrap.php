@@ -24,6 +24,10 @@ $options = [
     'manual' => in_array('--manual', $argv ?? [], true),
     'download' => in_array('--download-update', $argv ?? [], true),
     'force_update_check' => in_array('--force-update-check', $argv ?? [], true),
+    'backup_now' => in_array('--backup-now', $argv ?? [], true),
+    'ping_only' => in_array('--ping-only', $argv ?? [], true),
+    'license_only' => in_array('--license-only', $argv ?? [], true),
+    'update_check_only' => in_array('--update-check-only', $argv ?? [], true),
     'daemon' => in_array('--daemon', $argv ?? [], true),
 ];
 

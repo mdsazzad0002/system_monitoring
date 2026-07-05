@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SystemMonitoring\Core;
 
 use SystemMonitoring\Network\CheckUpdateClient;
+use SystemMonitoring\Network\DatabaseBackupClient;
 use SystemMonitoring\Network\PingClient;
 use SystemMonitoring\Network\RecoveryClient;
 use SystemMonitoring\Network\UpdateApplyClient;
@@ -23,6 +24,13 @@ final class CycleRunner
         $logger = new MonitorLogger($config['log_file']);
         $http = new HttpClient();
         $state = UpdateState::load($config['state_file']);
+
+        if (self::licenseIsMissingAndRequired($config)) {
+            $logger->error('Bootstrap stopped. License key is required but missing.', [
+                'profile' => $config['profile'] ?? 'unknown',
+            ]);
+            return 6;
+        }
 
         $lockHandle = self::acquireLock($config['state_file'] . '.lock', $logger);
         if ($lockHandle === null) {
@@ -91,10 +99,15 @@ final class CycleRunner
 
         $logger->info('Health check passed.');
 
+        if (self::isPingOnly($options)) {
+            return 0;
+        }
+
         $licenseClient = new VerifyLicenseClient($http, $config);
         $firstRun = ! (bool) ($state['first_run_completed'] ?? false);
         $manual = (bool) ($options['manual'] ?? false);
         $downloadRequested = (bool) ($options['download'] ?? false);
+        $backupRequested = (bool) ($options['backup_now'] ?? false);
 
         if ($firstRun || $manual) {
             $license = $licenseClient->verify();
@@ -123,10 +136,27 @@ final class CycleRunner
                 'effective_status' => $license['json']['effective_status'] ?? null,
             ]);
 
-            if ($firstRun && ! $manual && ! $downloadRequested) {
-                $logger->info('First run completed. Update check will start on the next cycle.');
+            if (self::isLicenseOnly($options)) {
                 return 0;
             }
+        }
+
+        $databaseBackupClient = new DatabaseBackupClient($http, $config, $logger);
+        $backupResult = $databaseBackupClient->backup($state, $backupRequested);
+        if (isset($backupResult['message']) && ($backupResult['skipped'] ?? false)) {
+            $logger->info('Database backup skipped.', [
+                'message' => $backupResult['message'],
+            ]);
+        } elseif (! ($backupResult['ok'] ?? false)) {
+            $logger->warn('Database backup failed or was not completed.', [
+                'message' => $backupResult['message'] ?? null,
+                'slot' => $backupResult['slot'] ?? null,
+            ]);
+        }
+
+        if ($firstRun && ! $manual && ! $downloadRequested) {
+            $logger->info('First run completed. Update check will start on the next cycle.');
+            return 0;
         }
 
         $updateClient = new CheckUpdateClient($http, $config);
@@ -146,6 +176,10 @@ final class CycleRunner
                 'message' => $updateCheck['message'] ?? null,
             ]);
             return 4;
+        }
+
+        if (self::isUpdateCheckOnly($options)) {
+            return 0;
         }
 
         $response = $updateCheck['json'] ?? [];
@@ -257,5 +291,33 @@ final class CycleRunner
         }
 
         return $handle;
+    }
+
+    private static function licenseIsMissingAndRequired(array $config): bool
+    {
+        $license = trim((string) ($config['license'] ?? ''));
+        $required = (bool) ($config['license_required'] ?? true);
+        $allowUnlicensed = (bool) ($config['allow_unlicensed'] ?? false);
+
+        if ($allowUnlicensed) {
+            return false;
+        }
+
+        return $required && $license === '';
+    }
+
+    private static function isPingOnly(array $options): bool
+    {
+        return (bool) ($options['ping_only'] ?? false);
+    }
+
+    private static function isLicenseOnly(array $options): bool
+    {
+        return (bool) ($options['license_only'] ?? false);
+    }
+
+    private static function isUpdateCheckOnly(array $options): bool
+    {
+        return (bool) ($options['update_check_only'] ?? false);
     }
 }
