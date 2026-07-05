@@ -9,7 +9,9 @@ It is designed to:
 - verify the license on first run
 - check updates on later runs
 - download update packages in chunks
+- reuse the same version package if it is already present
 - merge and apply updates with replace-only sync
+- clean downloaded zip and temp folders after apply
 - write a complete run log to `system_monitoring/system_monitoring.log`
 - store state in `update_data/updater.json`
 
@@ -63,6 +65,7 @@ This rebuild intentionally avoids the earlier destructive behavior.
 - target contents are not cleared first
 - if `update_target_root` is missing, the updater applies to the project root by default
 - the updater keeps files that are not part of the package
+- downloaded packages are removed after a successful apply
 
 ## Runtime Flow
 

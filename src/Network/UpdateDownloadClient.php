@@ -26,11 +26,41 @@ final class UpdateDownloadClient
         }
 
         $version = (string) ($updateInfo['latest_version'] ?? 'unknown');
-        $jobId = 'download-' . gmdate('YmdHis') . '-' . bin2hex(random_bytes(4));
         $downloadRoot = rtrim($this->config['download_root'], "\\/");
-        $jobRoot = $downloadRoot . DIRECTORY_SEPARATOR . $jobId;
-        $chunksDirectory = $jobRoot . DIRECTORY_SEPARATOR . 'chunks';
-        $packagePath = $jobRoot . DIRECTORY_SEPARATOR . 'update-' . $version . '.zip';
+        $safeVersion = $this->safeSegment($version);
+        $versionRoot = $downloadRoot . DIRECTORY_SEPARATOR . $safeVersion;
+        $chunksDirectory = $versionRoot . DIRECTORY_SEPARATOR . 'chunks';
+        $packagePath = $versionRoot . DIRECTORY_SEPARATOR . 'update.zip';
+
+        if (is_file($packagePath) && filesize($packagePath) > 0) {
+            $this->logger->info('Version package already exists. Reusing cached download.', [
+                'version' => $version,
+                'package_path' => $packagePath,
+            ]);
+
+            $this->state['last_download_job_id'] = 'cached-' . $safeVersion;
+            $this->state['last_download_url'] = $downloadUrl;
+            $this->state['last_download_path'] = $packagePath;
+            $this->state['last_download_chunks_directory'] = $chunksDirectory;
+            $this->state['last_download_at'] = gmdate('c');
+            $this->state['last_download_version'] = $version;
+            UpdateState::appendHistory($this->state, 'download_reused', [
+                'version' => $version,
+                'package_path' => $packagePath,
+            ]);
+
+            return [
+                'ok' => true,
+                'job_id' => 'cached-' . $safeVersion,
+                'package_path' => $packagePath,
+                'chunks_directory' => $chunksDirectory,
+                'total_chunks' => 0,
+                'total_size' => (int) filesize($packagePath),
+                'download_url' => $downloadUrl,
+                'version' => $version,
+                'reused' => true,
+            ];
+        }
 
         @mkdir($chunksDirectory, 0777, true);
 
@@ -38,10 +68,12 @@ final class UpdateDownloadClient
         $chunkSize = (int) $this->config['download_chunk_size'];
         $totalChunks = max(1, (int) ceil(max($totalSize, 1) / $chunkSize));
         $downloadedBytes = 0;
+        $jobId = 'download-' . gmdate('YmdHis') . '-' . bin2hex(random_bytes(4));
 
         $this->logger->info('Starting chunked download.', [
             'url' => $downloadUrl,
             'job_id' => $jobId,
+            'version' => $version,
             'chunks' => $totalChunks,
             'chunk_size' => $chunkSize,
         ]);
@@ -117,11 +149,13 @@ final class UpdateDownloadClient
 
         $this->state['last_download_path'] = $packagePath;
         $this->state['last_download_chunks_directory'] = $chunksDirectory;
+        $this->state['last_download_version'] = $version;
         UpdateState::appendHistory($this->state, 'download_completed', [
             'package_path' => $packagePath,
             'chunks_directory' => $chunksDirectory,
             'total_chunks' => $totalChunks,
             'total_size' => $totalSize,
+            'version' => $version,
         ]);
 
         $this->logger->info('Chunked download completed.', [
@@ -137,6 +171,7 @@ final class UpdateDownloadClient
             'total_chunks' => $totalChunks,
             'total_size' => $totalSize,
             'download_url' => $downloadUrl,
+            'version' => $version,
         ];
     }
 
@@ -152,5 +187,17 @@ final class UpdateDownloadClient
         }
 
         return 0;
+    }
+
+    private function safeSegment(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return 'unknown';
+        }
+
+        $value = preg_replace('/[^A-Za-z0-9._-]+/', '-', $value) ?: 'unknown';
+
+        return trim($value, '.-_') ?: 'unknown';
     }
 }

@@ -74,17 +74,22 @@ final class UpdateApplyClient
         $this->state['last_applied_package'] = $packagePath;
         $this->state['last_applied_at'] = gmdate('c');
         $this->state['last_applied_target_root'] = $targetRoot;
+        $this->state['last_applied_version'] = $this->state['last_download_version'] ?? null;
         UpdateState::appendHistory($this->state, 'apply_completed', [
             'package_path' => $packagePath,
             'target_root' => $targetRoot,
             'copied_files' => $copied,
+            'version' => $this->state['last_download_version'] ?? null,
         ]);
 
         $this->logger->info('Update applied with replace-only sync.', [
             'package_path' => $packagePath,
             'target_root' => $targetRoot,
             'copied_files' => $copied,
+            'version' => $this->state['last_download_version'] ?? null,
         ]);
+
+        $this->cleanupArtifacts($packagePath, $extractRoot, $sourceRoot);
 
         return [
             'ok' => true,
@@ -194,5 +199,19 @@ final class UpdateApplyClient
         }
 
         @rmdir($directory);
+    }
+
+    private function cleanupArtifacts(string $packagePath, string $extractRoot, string $sourceRoot): void
+    {
+        $this->deleteDirectory($extractRoot);
+
+        if (is_file($packagePath)) {
+            @unlink($packagePath);
+        }
+
+        $chunksDirectory = dirname($packagePath) . DIRECTORY_SEPARATOR . 'chunks';
+        if (is_dir($chunksDirectory)) {
+            $this->deleteDirectory($chunksDirectory);
+        }
     }
 }

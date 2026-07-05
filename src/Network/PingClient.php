@@ -29,6 +29,18 @@ final class PingClient
             'timeout' => $this->config['request_timeout'] ?? 30,
         ]);
 
+        if (! $response['ok'] && (int) ($response['status'] ?? 0) >= 500) {
+            usleep(250000);
+            $retry = $this->http->request('GET', $this->config['ping_url'], [
+                'timeout' => $this->config['request_timeout'] ?? 30,
+            ]);
+
+            if ($retry['ok']) {
+                $response = $retry;
+                $response['retry'] = true;
+            }
+        }
+
         return [
             'ok' => $response['ok'] && ($response['status'] ?? 0) >= 200 && ($response['status'] ?? 0) < 300,
             'status' => $response['status'] ?? 0,
@@ -36,6 +48,7 @@ final class PingClient
             'body' => $response['body'] ?? '',
             'json' => $response['json'] ?? null,
             'error' => $response['error'] ?? null,
+            'retry' => (bool) ($response['retry'] ?? false),
         ];
     }
 }

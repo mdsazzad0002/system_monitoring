@@ -39,15 +39,17 @@ final class CycleRunner
 
     private static function runInternal(array $options, array $config, MonitorLogger $logger, HttpClient $http, array &$state): int
     {
+        $currentVersion = (string) ($state['current_version'] ?? $config['current_version']);
+
         $logger->info('Bootstrap started.', [
             'software_id' => $config['software_id'],
-            'current_version' => $config['current_version'],
+            'current_version' => $currentVersion,
             'manual' => (bool) ($options['manual'] ?? false),
             'download' => (bool) ($options['download'] ?? false),
         ]);
 
         $state['softwareid'] = $config['software_id'];
-        $state['current_version'] = $config['current_version'];
+        $state['current_version'] = $currentVersion;
         $state['last_boot_at'] = gmdate('c');
 
         $pingClient = new PingClient($http, $config);
@@ -59,6 +61,7 @@ final class CycleRunner
         $state['last_ping_url'] = $config['ping_url'];
         UpdateState::appendHistory($state, $health['ok'] ? 'ping_ok' : 'ping_failed', [
             'message' => $health['ok'] ? 'Ping successful.' : ($health['error'] ?? 'Ping failed.'),
+            'retry' => (bool) ($health['retry'] ?? false),
         ]);
 
         if (! $health['ok']) {
@@ -66,6 +69,8 @@ final class CycleRunner
                 'url' => $config['ping_url'],
                 'http' => $health['status'] ?? 0,
                 'error' => $health['error'] ?? null,
+                'retry' => (bool) ($health['retry'] ?? false),
+                'body' => $health['body'] ?? null,
             ]);
 
             if ($config['auto_recovery']) {
@@ -124,7 +129,7 @@ final class CycleRunner
         }
 
         $updateClient = new CheckUpdateClient($http, $config);
-        $updateCheck = $updateClient->check((string) ($state['current_version'] ?? $config['current_version']));
+        $updateCheck = $updateClient->check($currentVersion);
 
         $state['last_update_check_at'] = gmdate('c');
         $state['last_update_http'] = (int) ($updateCheck['status'] ?? 0);
@@ -146,19 +151,19 @@ final class CycleRunner
         $updateAvailable = (bool) ($response['update_available'] ?? false);
         $state['last_update_available'] = $updateAvailable;
         $state['last_known_version'] = $response['latest_version'] ?? null;
-        $state['last_update_from'] = $config['current_version'];
-        $state['last_update_to'] = $response['latest_version'] ?? $config['current_version'];
+        $state['last_update_from'] = $currentVersion;
+        $state['last_update_to'] = $response['latest_version'] ?? $currentVersion;
 
         if (! $updateAvailable) {
             $logger->info('No update available.', [
-                'current_version' => $config['current_version'],
+                'current_version' => $currentVersion,
                 'latest_version' => $response['latest_version'] ?? null,
             ]);
             return 0;
         }
 
         $logger->warn('Update available.', [
-            'from' => $config['current_version'],
+            'from' => $currentVersion,
             'to' => $response['latest_version'] ?? null,
         ]);
 
@@ -191,10 +196,12 @@ final class CycleRunner
 
         $state['last_applied_package'] = $downloadResult['package_path'] ?? null;
         $state['last_applied_target_root'] = $applyResult['target_root'] ?? null;
+        $state['current_version'] = (string) ($downloadResult['version'] ?? $response['latest_version'] ?? $currentVersion);
 
         $logger->info('Update cycle finished successfully.', [
             'package_path' => $downloadResult['package_path'] ?? null,
             'target_root' => $applyResult['target_root'] ?? null,
+            'current_version' => $state['current_version'],
         ]);
 
         return 0;

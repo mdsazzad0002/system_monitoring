@@ -33,7 +33,7 @@ final class RecoveryManager
         if ($result['ok'] ?? false) {
             $this->logger->info('Recovery request completed.');
         } else {
-            $this->logger->warn('Recovery request skipped or failed.', [
+            $this->logger->info('Recovery URL is not configured or recovery skipped.', [
                 'message' => $result['message'] ?? 'Unknown',
             ]);
         }
