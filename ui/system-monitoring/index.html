@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Monitoring Console</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+        .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 20px 64px; }
+        .card { background: #111827; border: 1px solid #243041; border-radius: 18px; padding: 20px; margin-bottom: 18px; }
+        .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+        .btn { display:inline-block; border:0; border-radius: 12px; padding: 12px 16px; font-weight: 700; cursor: pointer; text-decoration: none; }
+        .btn-primary { background: #38bdf8; color: #082f49; }
+        .btn-dark { background: #1f2937; color: #fff; }
+        .btn-warn { background: #f59e0b; color: #111827; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .row { display:flex; gap:12px; flex-wrap:wrap; }
+        pre { white-space: pre-wrap; word-break: break-word; background:#020617; border-radius:14px; padding:16px; overflow:auto; min-height: 180px; }
+        .muted { color:#94a3b8; }
+        .pill { display:inline-block; padding:6px 10px; border-radius:999px; background:#1e293b; color:#cbd5e1; font-size:12px; }
+        .status { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+        .spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #334155; border-top-color: #38bdf8; animation: spin 1s linear infinite; display:none; }
+        .spinner.show { display:inline-block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        button { font: inherit; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="card">
+        <h1 style="margin:0 0 8px;">System Monitoring Console</h1>
+        <p class="muted" style="margin:0 0 12px;">Static HTML console that talks to the updater through AJAX.</p>
+        <div class="row" id="badges">
+            <span class="pill">Mode: loading</span>
+            <span class="pill">PHP: loading</span>
+            <span class="pill">Bootstrap: loading</span>
+            <span class="pill">Latest log: loading</span>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h3>Quick Actions</h3>
+            <div class="row">
+                <button class="btn btn-dark" data-command="ping">Ping Only</button>
+                <button class="btn btn-dark" data-command="license">License Check</button>
+                <button class="btn btn-primary" data-command="update_check">Update Check</button>
+                <button class="btn btn-warn" data-command="backup_now">Backup Now</button>
+                <button class="btn btn-danger" data-command="full_cycle">Full Cycle</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Runtime Config</h3>
+            <div class="status">
+                <span class="spinner" id="spinner"></span>
+                <span class="muted" id="statusText">Ready.</span>
+            </div>
+            <ul id="configList">
+                <li>App URL: loading</li>
+                <li>Config mode: loading</li>
+                <li>Updater root: loading</li>
+                <li>Bootstrap exists: loading</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Command Result</h3>
+        <pre id="output">No command output yet.</pre>
+    </div>
+</div>
+
+<script>
+const endpoints = {
+    data: './data',
+    run: './run'
+};
+
+const badges = document.getElementById('badges');
+const configList = document.getElementById('configList');
+const output = document.getElementById('output');
+const spinner = document.getElementById('spinner');
+const statusText = document.getElementById('statusText');
+
+function setLoading(isLoading, message) {
+    spinner.classList.toggle('show', isLoading);
+    statusText.textContent = message || (isLoading ? 'Working...' : 'Ready.');
+}
+
+function renderData(data) {
+    const items = [
+        `Mode: ${data.profile ?? 'global'}`,
+        `PHP: ${data.php_binary ?? 'unknown'}`,
+        `Bootstrap: ${data.bootstrap_exists ? 'ready' : 'missing'}`,
+        `Latest log: ${data.latest_log ?? 'none'}`
+    ];
+    badges.innerHTML = items.map(item => `<span class="pill">${escapeHtml(item)}</span>`).join('');
+
+    configList.innerHTML = `
+        <li>App URL: ${escapeHtml(data.app_url ?? 'unknown')}</li>
+        <li>Config mode: ${escapeHtml(data.config_mode ?? 'global')}</li>
+        <li>Updater root: ${escapeHtml(data.updater_root ?? 'not found')}</li>
+        <li>Bootstrap exists: ${data.bootstrap_exists ? 'yes' : 'no'}</li>
+    `;
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+async function loadData() {
+    setLoading(true, 'Loading status...');
+    try {
+        const response = await fetch(endpoints.data, { headers: { 'Accept': 'application/json' } });
+        const data = await response.json();
+        renderData(data);
+        statusText.textContent = data.message || 'Ready.';
+    } catch (error) {
+        statusText.textContent = 'Failed to load status.';
+        output.textContent = String(error);
+    } finally {
+        setLoading(false, statusText.textContent);
+    }
+}
+
+async function runCommand(command) {
+    setLoading(true, `Running ${command}...`);
+    output.textContent = 'Running...';
+    try {
+        const form = new FormData();
+        form.append('command', command);
+
+        const response = await fetch(endpoints.run, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            body: form
+        });
+
+        const data = await response.json();
+        output.textContent = data.output || data.message || JSON.stringify(data, null, 2);
+        if (data.config) {
+            renderData(data.config);
+        }
+        statusText.textContent = data.message || `Finished with status ${data.status ?? 'unknown'}.`;
+    } catch (error) {
+        output.textContent = String(error);
+        statusText.textContent = 'Command failed.';
+    } finally {
+        setLoading(false, statusText.textContent);
+    }
+}
+
+document.querySelectorAll('button[data-command]').forEach(button => {
+    button.addEventListener('click', () => runCommand(button.dataset.command));
+});
+
+loadData();
+</script>
+</body>
+</html>

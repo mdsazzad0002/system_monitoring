@@ -14,11 +14,6 @@ if (! function_exists('system_monitoring_config')) {
         $projectRoot = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
         $env = system_monitoring_load_env($projectRoot . DIRECTORY_SEPARATOR . '.env');
         $fallbackEnv = system_monitoring_load_env($projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . '.env');
-        $instanceConfig = system_monitoring_load_instance_config($projectRoot);
-
-        if ($instanceConfig !== []) {
-            $env = array_merge($instanceConfig, $env);
-        }
 
         if ($fallbackEnv !== []) {
             $env = array_merge($fallbackEnv, $env);
@@ -78,8 +73,6 @@ if (! function_exists('system_monitoring_config')) {
         $config = [
             'project_root' => $projectRoot,
             'env_path' => $projectRoot . DIRECTORY_SEPARATOR . '.env',
-            'instance_config_path' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring.instance.php',
-            'instance_runtime_path' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'system_monitoring.instance.php',
             'log_file' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring' . DIRECTORY_SEPARATOR . 'system_monitoring.log',
             'state_file' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'updater.json',
             'download_root' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'downloads',
@@ -156,47 +149,6 @@ if (! function_exists('system_monitoring_config')) {
         }
 
         return $result;
-    }
-
-    function system_monitoring_load_instance_config(string $projectRoot): array
-    {
-        $paths = [
-            $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring.instance.php',
-            $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'system_monitoring.instance.php',
-        ];
-
-        $merged = [];
-
-        foreach ($paths as $path) {
-            if (! is_file($path)) {
-                continue;
-            }
-
-            $data = include $path;
-            if (! is_array($data)) {
-                continue;
-            }
-
-            $merged = array_merge($merged, $data);
-        }
-
-        if ($merged === []) {
-            return [];
-        }
-
-        $profile = system_monitoring_env_value($merged, ['SYSTEM_MONITORING_PROFILE', 'system_monitoring_profile', 'profile']) ?? 'windows_local';
-        $profiles = $merged['profiles'] ?? [];
-        $selectedProfile = is_array($profiles) && isset($profiles[$profile]) && is_array($profiles[$profile])
-            ? $profiles[$profile]
-            : [];
-
-        unset($merged['profiles'], $merged['profile']);
-
-        if ($selectedProfile !== []) {
-            $merged = array_merge($merged, $selectedProfile);
-        }
-
-        return $merged;
     }
 
     function system_monitoring_env_value(array $env, array $keys): ?string

@@ -5,7 +5,7 @@ This folder contains the small CLI updater/health-monitor script.
 It is designed to:
 
 - read settings from the root `.env`
-- optionally read `system_monitoring.instance.php` for one-file profile overrides
+- use `.env` plus `config.php` as the single global configuration source
 - ping the server
 - verify the license on first run
 - check updates on later runs
@@ -54,23 +54,6 @@ database_backup_times="00:00,12:00"
 database_backup_retry_minutes=30
 database_backup_chunk_size=2097152
 database_backup_root="D:/path/to/your/project/system_monitoring_update_data/database_backups"
-
-## Instance Profile File
-
-For easier switching between Windows local, live server, and Ubuntu server, you can keep a single profile file:
-
-`system_monitoring/system_monitoring.instance.php`
-
-It supports these profiles:
-
-- `windows_local`
-- `live_server`
-- `ubuntu_server`
-
-You can change the active profile with:
-
-```env
-SYSTEM_MONITORING_PROFILE=live_server
 ```
 
 License behavior:
