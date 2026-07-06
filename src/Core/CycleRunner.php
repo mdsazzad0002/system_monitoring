@@ -122,14 +122,17 @@ final class CycleRunner
             $state['last_license_subscription_type'] = $license['json']['subscription_type'] ?? null;
             $state['last_license_effective_status'] = $license['json']['effective_status'] ?? null;
             $state['last_license_expires_at'] = $license['json']['expires_at'] ?? null;
+            $state['last_license_maintenance_end_date'] = $license['json']['maintenance_end_date'] ?? null;
             $state['license_subscription_type'] = $license['json']['subscription_type'] ?? null;
             $state['license_effective_status'] = $license['json']['effective_status'] ?? null;
             $state['license_expires_at'] = $license['json']['expires_at'] ?? null;
+            $state['license_maintenance_end_date'] = $license['json']['maintenance_end_date'] ?? null;
             UpdateState::appendHistory($state, 'license_check', [
                 'status' => $license['ok'] ?? false,
                 'http' => $license['status'] ?? 0,
                 'subscription_type' => $license['json']['subscription_type'] ?? null,
                 'effective_status' => $license['json']['effective_status'] ?? null,
+                'maintenance_end_date' => $license['json']['maintenance_end_date'] ?? null,
             ]);
 
             if (! ($license['ok'] ?? false)) {
@@ -154,6 +157,19 @@ final class CycleRunner
             }
         }
 
+        if (self::isMaintenanceExpired($state)) {
+            $logger->warn('Maintenance period expired. Skipping backup and update checks.', [
+                'maintenance_end_date' => $state['last_license_maintenance_end_date'] ?? $state['license_maintenance_end_date'] ?? null,
+            ]);
+            $state['last_service_blocked_at'] = gmdate('c');
+            $state['last_service_blocked_reason'] = 'maintenance_expired';
+            UpdateState::appendHistory($state, 'service_blocked', [
+                'reason' => 'maintenance_expired',
+                'maintenance_end_date' => $state['last_license_maintenance_end_date'] ?? $state['license_maintenance_end_date'] ?? null,
+            ]);
+            return 0;
+        }
+
         $databaseBackupClient = new DatabaseBackupClient($http, $config, $logger);
         $backupResult = $databaseBackupClient->backup($state, $backupRequested);
         if (isset($backupResult['message']) && ($backupResult['skipped'] ?? false)) {
@@ -165,11 +181,6 @@ final class CycleRunner
                 'message' => $backupResult['message'] ?? null,
                 'slot' => $backupResult['slot'] ?? null,
             ]);
-        }
-
-        if ($firstRun && ! $manual && ! $downloadRequested) {
-            $logger->info('First run completed. Update check will start on the next cycle.');
-            return 0;
         }
 
         $updateClient = new CheckUpdateClient($http, $config);
@@ -313,7 +324,7 @@ final class CycleRunner
         $state['last_download_path'] = $downloadResult['package_path'] ?? null;
 
         $applyClient = new UpdateApplyClient($config, $logger, $state);
-        $applyResult = $applyClient->apply((string) ($downloadResult['package_path'] ?? ''));
+        $applyResult = $applyClient->apply((string) ($downloadResult['package_path'] ?? ''), $response);
 
         if (! ($applyResult['ok'] ?? false)) {
             $logger->warn('Apply skipped or failed.', [
@@ -383,6 +394,22 @@ final class CycleRunner
     private static function isUpdateCheckOnly(array $options): bool
     {
         return (bool) ($options['update_check_only'] ?? false);
+    }
+
+    private static function isMaintenanceExpired(array $state): bool
+    {
+        $maintenanceEndDate = trim((string) ($state['last_license_maintenance_end_date'] ?? $state['license_maintenance_end_date'] ?? ''));
+
+        if ($maintenanceEndDate === '') {
+            return false;
+        }
+
+        try {
+            $maintenanceDate = new \DateTimeImmutable($maintenanceEndDate);
+            return $maintenanceDate->setTime(23, 59, 59)->getTimestamp() < time();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     private static function resolveCurrentVersion(array $state, array $config): string

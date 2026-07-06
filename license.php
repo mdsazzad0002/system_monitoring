@@ -42,6 +42,7 @@ if (! function_exists('system_monitoring_license_status')) {
         $effectiveStatus = strtolower(trim((string) ($state['last_license_effective_status'] ?? $state['license_effective_status'] ?? '')));
         $subscription = strtolower(trim((string) ($state['last_license_subscription_type'] ?? $state['license_subscription_type'] ?? '')));
         $expiresAt = trim((string) ($state['last_license_expires_at'] ?? $state['license_expires_at'] ?? ''));
+        $maintenanceEndDate = trim((string) ($state['last_license_maintenance_end_date'] ?? $state['license_maintenance_end_date'] ?? ''));
         $licenseValid = (bool) ($state['license_valid'] ?? false);
 
         if ($effectiveStatus !== '' && system_monitoring_license_is_blocked_status($effectiveStatus)) {
@@ -53,6 +54,8 @@ if (! function_exists('system_monitoring_license_status')) {
                 'effective_status' => $effectiveStatus,
                 'subscription_type' => $subscription,
                 'expires_at' => $expiresAt !== '' ? $expiresAt : null,
+                'maintenance_end_date' => $maintenanceEndDate !== '' ? $maintenanceEndDate : null,
+                'service_entitlement' => ! system_monitoring_maintenance_is_expired($maintenanceEndDate),
                 'state' => $state,
                 'config' => $config,
             ];
@@ -70,6 +73,8 @@ if (! function_exists('system_monitoring_license_status')) {
                         'effective_status' => $effectiveStatus !== '' ? $effectiveStatus : null,
                         'subscription_type' => $subscription !== '' ? $subscription : null,
                         'expires_at' => $expiresAt,
+                        'maintenance_end_date' => $maintenanceEndDate !== '' ? $maintenanceEndDate : null,
+                        'service_entitlement' => ! system_monitoring_maintenance_is_expired($maintenanceEndDate),
                         'state' => $state,
                         'config' => $config,
                     ];
@@ -88,19 +93,25 @@ if (! function_exists('system_monitoring_license_status')) {
                 'effective_status' => $effectiveStatus !== '' ? $effectiveStatus : null,
                 'subscription_type' => $subscription !== '' ? $subscription : null,
                 'expires_at' => $expiresAt !== '' ? $expiresAt : null,
+                'maintenance_end_date' => $maintenanceEndDate !== '' ? $maintenanceEndDate : null,
+                'service_entitlement' => ! system_monitoring_maintenance_is_expired($maintenanceEndDate),
                 'state' => $state,
                 'config' => $config,
             ];
         }
 
+        $maintenanceExpired = system_monitoring_maintenance_is_expired($maintenanceEndDate);
+
         return [
             'required' => true,
             'redirect' => false,
-            'reason' => 'active_license',
+            'reason' => $maintenanceExpired ? 'maintenance_expired' : 'active_license',
             'license' => $license,
             'effective_status' => $effectiveStatus !== '' ? $effectiveStatus : null,
             'subscription_type' => $subscription !== '' ? $subscription : null,
             'expires_at' => $expiresAt !== '' ? $expiresAt : null,
+            'maintenance_end_date' => $maintenanceEndDate !== '' ? $maintenanceEndDate : null,
+            'service_entitlement' => ! $maintenanceExpired,
             'state' => $state,
             'config' => $config,
         ];
@@ -122,3 +133,21 @@ if (! function_exists('system_monitoring_license_is_blocked_status')) {
     }
 }
 
+if (! function_exists('system_monitoring_maintenance_is_expired')) {
+    function system_monitoring_maintenance_is_expired(?string $maintenanceEndDate): bool
+    {
+        $maintenanceEndDate = trim((string) $maintenanceEndDate);
+
+        if ($maintenanceEndDate === '') {
+            return false;
+        }
+
+        try {
+            $date = new DateTimeImmutable($maintenanceEndDate);
+
+            return $date->setTime(23, 59, 59)->getTimestamp() < time();
+        } catch (Throwable) {
+            return false;
+        }
+    }
+}

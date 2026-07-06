@@ -102,6 +102,7 @@ function renderData(data) {
         <li>Config mode: ${escapeHtml(data.config_mode ?? 'global')}</li>
         <li>Updater root: ${escapeHtml(data.updater_root ?? 'not found')}</li>
         <li>Bootstrap exists: ${data.bootstrap_exists ? 'yes' : 'no'}</li>
+        <li>Maintenance end date: ${escapeHtml(data.maintenance_end_date ?? 'not available')}</li>
     `;
 }
 
