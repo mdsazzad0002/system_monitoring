@@ -74,6 +74,7 @@ final class DatabaseBackupClient
         }
 
         $state['last_database_backup_at'] = gmdate('c');
+        $state['last_database_backup_success_at'] = gmdate('c');
         $state['last_database_backup_slot'] = $slot['slot_key'];
         $state['last_database_backup_remote_id'] = $uploadResult['backup_id'] ?? null;
         $state['last_database_backup_remote_path'] = $uploadResult['metadata_path'] ?? null;
@@ -115,8 +116,21 @@ final class DatabaseBackupClient
             ];
         }
 
-        $times = $this->parseScheduleTimes((string) ($this->config['database_backup_times'] ?? '00:00,12:00'));
+        $times = $this->parseScheduleTimes((string) ($this->config['database_backup_times'] ?? '12:00,22:00'));
         $slots = $this->buildSlots($times, $now);
+        $minimumGapHours = max(1, (int) ($this->config['database_backup_min_gap_hours'] ?? 6));
+        $lastSuccessAt = $state['last_database_backup_success_at'] ?? null;
+
+        if (is_string($lastSuccessAt) && $lastSuccessAt !== '') {
+            try {
+                $lastSuccess = new DateTimeImmutable($lastSuccessAt);
+                if ($now < $lastSuccess->modify('+' . $minimumGapHours . ' hours')) {
+                    return null;
+                }
+            } catch (\Throwable) {
+                // Ignore malformed timestamps and continue scheduling.
+            }
+        }
 
         foreach ($slots as $slot) {
             $slotState = $state['database_backup_slots'][$slot['slot_key']] ?? [];
@@ -189,7 +203,7 @@ final class DatabaseBackupClient
             $times[] = $candidate;
         }
 
-        return $times !== [] ? array_values(array_unique($times)) : ['00:00', '12:00'];
+        return $times !== [] ? array_values(array_unique($times)) : ['12:00', '22:00'];
     }
 
     private function createDatabaseDump(array $slot): array
@@ -609,7 +623,7 @@ final class DatabaseBackupClient
     {
         $state['database_backup_slots'] ??= [];
         $slotState = $state['database_backup_slots'][$slot['slot_key']] ?? [];
-        $retryMinutes = (int) ($this->config['database_backup_retry_minutes'] ?? 30);
+        $retryMinutes = $this->resolveRetryMinutes($state);
         $now = new DateTimeImmutable('now');
 
         $slotState['status'] = $reason === 'busy' ? 'blocked' : 'failed';
@@ -630,11 +644,12 @@ final class DatabaseBackupClient
         $state['last_database_backup_error'] = $message;
         $state['last_database_backup_slot'] = $slot['slot_key'];
         $state['last_database_backup_at'] = $now->format(DATE_ATOM);
+        $state['last_database_backup_attempt_at'] = $now->format(DATE_ATOM);
     }
 
     private function resolveNextScheduleAt(string $slotTime, DateTimeImmutable $now): DateTimeImmutable
     {
-        $times = $this->parseScheduleTimes((string) ($this->config['database_backup_times'] ?? '00:00,12:00'));
+        $times = $this->parseScheduleTimes((string) ($this->config['database_backup_times'] ?? '12:00,22:00'));
         $currentIndex = array_search($slotTime, $times, true);
 
         if ($currentIndex === false || count($times) === 0) {
@@ -647,6 +662,28 @@ final class DatabaseBackupClient
         [$hour, $minute] = array_map('intval', explode(':', $nextTime, 2));
 
         return $nextDate->setTime($hour, $minute, 0);
+    }
+
+    private function resolveRetryMinutes(array $state): int
+    {
+        $defaultRetryMinutes = max(1, (int) ($this->config['database_backup_retry_minutes'] ?? 30));
+        $staleRetryMinutes = max(1, (int) ($this->config['database_backup_stale_retry_minutes'] ?? 10));
+        $minimumGapHours = max(1, (int) ($this->config['database_backup_min_gap_hours'] ?? 6));
+        $lastSuccessAt = $state['last_database_backup_success_at'] ?? null;
+
+        if (! is_string($lastSuccessAt) || $lastSuccessAt === '') {
+            return $staleRetryMinutes;
+        }
+
+        try {
+            $lastSuccess = new DateTimeImmutable($lastSuccessAt);
+        } catch (\Throwable) {
+            return $staleRetryMinutes;
+        }
+
+        return time() >= $lastSuccess->modify('+' . $minimumGapHours . ' hours')->getTimestamp()
+            ? $staleRetryMinutes
+            : $defaultRetryMinutes;
     }
 
     private function isBusyStatus(array $response): bool

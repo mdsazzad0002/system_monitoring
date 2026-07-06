@@ -16,8 +16,10 @@ It is designed to:
 - reuse the same version package if it is already present
 - merge and apply updates with replace-only sync
 - clean downloaded zip and temp folders after apply
-- write a complete run log to a day-wise file like `system_monitoring/system_monitoring-YYYY-MM-DD.log`
+- write a complete run log to a day-wise file like `system_monitoring_update_data/system_monitoring-YYYY-MM-DD.log`
 - store state in `system_monitoring_update_data/updater.json`
+- read primary updater settings from `system_monitoring_update_data/system_monitoring.json`
+- cache the latest update response in `system_monitoring_update_data/runtime_cache.json`
 
 ## Run
 
@@ -38,22 +40,26 @@ php system_monitoring/bootstrap.php --backup-now
 
 The updater reads the root `.env` file.
 
-Example:
+Example `.env` still works as fallback, but JSON is preferred for updater settings:
 
 ```env
 license="LIC-XXXX-XXXX-XXXX-XXXX"
-targethost="http://system.localhost"
-softwareid="testproject"
-currentversion="0.0.0"
-auto_recovery=true
-auto_download_update=true
-update_mode=partial
-update_target_root="D:/path/to/your/project"
-auto_database_backup=true
-database_backup_times="00:00,12:00"
-database_backup_retry_minutes=30
-database_backup_chunk_size=2097152
-database_backup_root="D:/path/to/your/project/system_monitoring_update_data/database_backups"
+```
+
+Preferred JSON config:
+
+```json
+{
+  "license": "LIC-XXXX-XXXX-XXXX-XXXX",
+  "target_host": "http://system.localhost",
+  "software_id": "testproject",
+  "current_version": "3",
+  "update_mode": "partial",
+  "auto_recovery": true,
+  "auto_download_update": true,
+  "database_backup_stale_retry_minutes": 10,
+  "database_backup_retry_minutes": 30
+}
 ```
 
 License behavior:
@@ -72,7 +78,9 @@ License behavior:
 - `auto_download_update` - automatically download and apply updates when found
 - `auto_database_backup` - automatically generate and send database backups
 - `database_backup_times` - comma-separated times for the 2 daily backups
+- `database_backup_min_gap_hours` - minimum gap between successful backups
 - `database_backup_retry_minutes` - retry wait when a non-busy backup fails
+- `database_backup_stale_retry_minutes` - retry wait when no successful backup exists within the minimum gap window
 - `database_backup_chunk_size` - upload chunk size for backup files
 - `database_backup_root` - local temp folder used before upload completes
 - `license_required` - blocks updater startup when `license` is missing
@@ -123,6 +131,18 @@ It keeps:
 - last applied package
 - last backup metadata
 - history events
+
+The runtime cache keeps:
+
+- the last background spawn window
+- the last update check response
+- the cache expiry timestamp
+- the source used for the response, either `remote` or `cache`
+
+Update cache TTL:
+
+- default: `3600` seconds
+- override with `update_cache_ttl_seconds` in `.env`
 
 ## Notes
 

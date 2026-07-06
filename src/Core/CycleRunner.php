@@ -48,7 +48,12 @@ final class CycleRunner
 
     private static function runInternal(array $options, array $config, MonitorLogger $logger, HttpClient $http, array &$state): int
     {
-        $currentVersion = (string) ($state['current_version'] ?? $config['current_version']);
+        $currentVersion = self::resolveCurrentVersion($state, $config);
+        $runtimeCache = \system_monitoring_load_runtime_cache();
+
+        if ($currentVersion !== '' && (string) ($state['current_version'] ?? '') !== $currentVersion) {
+            $state['current_version'] = $currentVersion;
+        }
 
         $logger->info('Bootstrap started.', [
             'software_id' => $config['software_id'],
@@ -114,9 +119,17 @@ final class CycleRunner
             $state['last_license_check_at'] = gmdate('c');
             $state['last_license_check_http'] = (int) ($license['status'] ?? 0);
             $state['license_valid'] = (bool) ($license['ok'] ?? false);
+            $state['last_license_subscription_type'] = $license['json']['subscription_type'] ?? null;
+            $state['last_license_effective_status'] = $license['json']['effective_status'] ?? null;
+            $state['last_license_expires_at'] = $license['json']['expires_at'] ?? null;
+            $state['license_subscription_type'] = $license['json']['subscription_type'] ?? null;
+            $state['license_effective_status'] = $license['json']['effective_status'] ?? null;
+            $state['license_expires_at'] = $license['json']['expires_at'] ?? null;
             UpdateState::appendHistory($state, 'license_check', [
                 'status' => $license['ok'] ?? false,
                 'http' => $license['status'] ?? 0,
+                'subscription_type' => $license['json']['subscription_type'] ?? null,
+                'effective_status' => $license['json']['effective_status'] ?? null,
             ]);
 
             if (! ($license['ok'] ?? false)) {
@@ -160,7 +173,55 @@ final class CycleRunner
         }
 
         $updateClient = new CheckUpdateClient($http, $config);
-        $updateCheck = $updateClient->check($currentVersion);
+        $useCachedUpdate = \system_monitoring_runtime_cache_should_use_update($runtimeCache, $config, $currentVersion, $options);
+
+        if ($useCachedUpdate) {
+            $cachedUpdate = $runtimeCache['update'] ?? [];
+            $cachedResponse = \system_monitoring_update_cache_response($runtimeCache);
+            $cachedMessage = is_array($cachedUpdate) ? (string) ($cachedUpdate['error'] ?? ($cachedResponse['message'] ?? '')) : '';
+            $cachedOk = is_array($cachedResponse) && $cachedResponse !== [];
+            $updateCheck = [
+                'ok' => $cachedOk,
+                'status' => (int) ($cachedUpdate['status'] ?? 200),
+                'json' => $cachedOk ? $cachedResponse : null,
+                'body' => '',
+                'message' => $cachedMessage !== '' ? $cachedMessage : null,
+                'source' => 'cache',
+            ];
+
+            $logger->info('Using cached update check response.', [
+                'checked_at' => $cachedUpdate['checked_at'] ?? null,
+                'expires_at' => $cachedUpdate['expires_at'] ?? null,
+                'current_version' => $currentVersion,
+            ]);
+        } else {
+            $updateCheck = $updateClient->check($currentVersion);
+
+            if (($updateCheck['ok'] ?? false) && is_array($updateCheck['json'] ?? null)) {
+                $runtimeCache['update'] = \system_monitoring_build_update_cache_entry(
+                    $config,
+                    $currentVersion,
+                    $updateCheck['json'] ?? [],
+                    (int) ($updateCheck['status'] ?? 0)
+                );
+                $runtimeCache['update']['source'] = 'remote';
+                $runtimeCache['update']['error'] = null;
+                \system_monitoring_save_runtime_cache($runtimeCache);
+            } elseif (! ($updateCheck['ok'] ?? false)) {
+                $runtimeCache['update'] = [
+                    'checked_at' => gmdate('c'),
+                    'expires_at' => gmdate('c', time() + max(300, (int) ($config['update_cache_ttl_seconds'] ?? 3600))),
+                    'software_id' => (string) ($config['software_id'] ?? ''),
+                    'current_version' => $currentVersion,
+                    'target_host' => (string) ($config['target_host'] ?? ''),
+                    'status' => (int) ($updateCheck['status'] ?? 0),
+                    'source' => 'remote',
+                    'response' => null,
+                    'error' => (string) ($updateCheck['message'] ?? 'Update check failed.'),
+                ];
+                \system_monitoring_save_runtime_cache($runtimeCache);
+            }
+        }
 
         $state['last_update_check_at'] = gmdate('c');
         $state['last_update_http'] = (int) ($updateCheck['status'] ?? 0);
@@ -168,12 +229,14 @@ final class CycleRunner
         UpdateState::appendHistory($state, 'update_check', [
             'status' => $updateCheck['ok'] ?? false,
             'http' => $updateCheck['status'] ?? 0,
+            'source' => $updateCheck['source'] ?? 'remote',
         ]);
 
         if (! ($updateCheck['ok'] ?? false)) {
             $logger->warn('Update check request failed.', [
                 'http' => $updateCheck['status'] ?? 0,
                 'message' => $updateCheck['message'] ?? null,
+                'source' => $updateCheck['source'] ?? 'remote',
             ]);
             return 4;
         }
@@ -199,6 +262,7 @@ final class CycleRunner
                 'current_version' => $currentVersion,
                 'latest_version' => $response['latest_version'] ?? null,
                 'version_type' => $versionType,
+                'source' => $updateCheck['source'] ?? 'remote',
             ]);
             return 0;
         }
@@ -319,5 +383,24 @@ final class CycleRunner
     private static function isUpdateCheckOnly(array $options): bool
     {
         return (bool) ($options['update_check_only'] ?? false);
+    }
+
+    private static function resolveCurrentVersion(array $state, array $config): string
+    {
+        $stateVersion = trim((string) ($state['current_version'] ?? ''));
+        $configVersion = trim((string) ($config['current_version'] ?? ''));
+
+        if ($configVersion !== '' && self::isPlaceholderVersion($stateVersion)) {
+            return $configVersion;
+        }
+
+        return $stateVersion !== '' ? $stateVersion : $configVersion;
+    }
+
+    private static function isPlaceholderVersion(string $version): bool
+    {
+        $normalized = strtolower(trim($version));
+
+        return in_array($normalized, ['', '0', '0.0', '0.0.0', 'unknown', 'unknown-version'], true);
     }
 }

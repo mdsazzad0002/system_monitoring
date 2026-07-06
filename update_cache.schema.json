@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "update_cache.schema.json",
+  "title": "System Monitoring Runtime Cache",
+  "type": "object",
+  "required": ["schema_version", "daemon", "update"],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "daemon": {
+      "type": "object",
+      "required": ["last_spawn_at", "next_spawn_at", "last_spawn_key", "last_spawn_ok"],
+      "properties": {
+        "last_spawn_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "next_spawn_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "last_spawn_key": {
+          "type": ["string", "null"]
+        },
+        "last_spawn_ok": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "update": {
+      "type": "object",
+      "required": ["checked_at", "expires_at", "software_id", "current_version", "target_host", "status", "source", "response", "error"],
+      "properties": {
+        "checked_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "software_id": {
+          "type": ["string", "null"]
+        },
+        "current_version": {
+          "type": ["string", "null"]
+        },
+        "target_host": {
+          "type": ["string", "null"]
+        },
+        "status": {
+          "type": ["integer", "null"]
+        },
+        "source": {
+          "type": ["string", "null"],
+          "enum": ["cache", "remote", null]
+        },
+        "response": {
+          "type": ["object", "null"]
+        },
+        "error": {
+          "type": ["string", "null"]
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

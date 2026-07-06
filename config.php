@@ -14,9 +14,14 @@ if (! function_exists('system_monitoring_config')) {
         $projectRoot = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
         $env = system_monitoring_load_env($projectRoot . DIRECTORY_SEPARATOR . '.env');
         $fallbackEnv = system_monitoring_load_env($projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . '.env');
+        $jsonConfig = system_monitoring_load_json_config($projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'system_monitoring.json');
 
         if ($fallbackEnv !== []) {
             $env = array_merge($fallbackEnv, $env);
+        }
+
+        if ($jsonConfig !== []) {
+            $env = array_merge($env, $jsonConfig);
         }
 
         $softwareId = system_monitoring_env_value($env, ['softwareid', 'software_id', 'software']) ?? 'default';
@@ -49,10 +54,20 @@ if (! function_exists('system_monitoring_config')) {
         }
 
         $recoveryUrl = system_monitoring_env_value($env, ['recovery_url']);
-        $databaseBackupTimes = system_monitoring_env_value($env, ['database_backup_times']) ?? '00:00,12:00';
+        $databaseBackupTimes = system_monitoring_env_value($env, ['database_backup_times']) ?? '12:00,22:00';
         $databaseBackupRetryMinutes = (int) (system_monitoring_env_value($env, ['database_backup_retry_minutes']) ?? 30);
         if ($databaseBackupRetryMinutes < 1) {
             $databaseBackupRetryMinutes = 1;
+        }
+
+        $databaseBackupStaleRetryMinutes = (int) (system_monitoring_env_value($env, ['database_backup_stale_retry_minutes']) ?? 10);
+        if ($databaseBackupStaleRetryMinutes < 1) {
+            $databaseBackupStaleRetryMinutes = 1;
+        }
+
+        $databaseBackupMinGapHours = (int) (system_monitoring_env_value($env, ['database_backup_min_gap_hours']) ?? 6);
+        if ($databaseBackupMinGapHours < 1) {
+            $databaseBackupMinGapHours = 1;
         }
 
         $databaseBackupChunkSize = (int) (system_monitoring_env_value($env, ['database_backup_chunk_size']) ?? 2097152);
@@ -65,6 +80,11 @@ if (! function_exists('system_monitoring_config')) {
             $databaseBackupTimeout = 5;
         }
 
+        $updateCacheTtl = (int) (system_monitoring_env_value($env, ['update_cache_ttl_seconds', 'update_check_cache_ttl_seconds', 'update_check_ttl_seconds']) ?? 3600);
+        if ($updateCacheTtl < 300) {
+            $updateCacheTtl = 300;
+        }
+
         $databaseBackupRoot = system_monitoring_env_value($env, ['database_backup_root', 'backup_temp_root']);
         $databaseBackupRoot = $databaseBackupRoot !== null && $databaseBackupRoot !== ''
             ? system_monitoring_resolve_path($databaseBackupRoot, $projectRoot)
@@ -73,7 +93,7 @@ if (! function_exists('system_monitoring_config')) {
         $config = [
             'project_root' => $projectRoot,
             'env_path' => $projectRoot . DIRECTORY_SEPARATOR . '.env',
-            'log_file' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring' . DIRECTORY_SEPARATOR . 'system_monitoring.log',
+            'log_file' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'system_monitoring.log',
             'state_file' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'updater.json',
             'download_root' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'downloads',
             'backup_root' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'backups',
@@ -101,11 +121,14 @@ if (! function_exists('system_monitoring_config')) {
             'auto_database_backup' => system_monitoring_env_bool($env, ['auto_database_backup', 'auto_backup'], true),
             'database_backup_times' => $databaseBackupTimes,
             'database_backup_retry_minutes' => $databaseBackupRetryMinutes,
+            'database_backup_stale_retry_minutes' => $databaseBackupStaleRetryMinutes,
+            'database_backup_min_gap_hours' => $databaseBackupMinGapHours,
             'database_backup_chunk_size' => $databaseBackupChunkSize,
             'database_backup_timeout' => $databaseBackupTimeout,
             'database_backup_root' => $databaseBackupRoot,
             'database_backup_keep_local' => system_monitoring_env_bool($env, ['database_backup_keep_local'], false),
             'allow_self_update' => system_monitoring_env_bool($env, ['allow_self_update'], false),
+            'update_cache_ttl_seconds' => $updateCacheTtl,
             'download_chunk_size' => $downloadChunkSize,
             'download_timeout' => $downloadTimeout,
             'request_timeout' => $downloadTimeout,
@@ -143,6 +166,39 @@ if (! function_exists('system_monitoring_config')) {
 
             if ($value !== '' && (($value[0] === '"' && substr($value, -1) === '"') || ($value[0] === "'" && substr($value, -1) === "'"))) {
                 $value = substr($value, 1, -1);
+            }
+
+            $result[$key] = $value;
+        }
+
+        return $result;
+    }
+
+    function system_monitoring_load_json_config(string $path): array
+    {
+        if (! is_file($path)) {
+            return [];
+        }
+
+        $decoded = json_decode((string) file_get_contents($path), true);
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($decoded as $key => $value) {
+            if (! is_string($key) || $key === '') {
+                continue;
+            }
+
+            if (is_bool($value)) {
+                $result[$key] = $value ? 'true' : 'false';
+                continue;
+            }
+
+            if (is_int($value) || is_float($value) || is_string($value) || $value === null) {
+                $result[$key] = $value;
+                continue;
             }
 
             $result[$key] = $value;
