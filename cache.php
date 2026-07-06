@@ -57,6 +57,32 @@ if (! function_exists('system_monitoring_save_runtime_cache')) {
     }
 }
 
+if (! function_exists('system_monitoring_cache_remember')) {
+    function system_monitoring_cache_remember(string $key, int $ttlSeconds, callable $callback)
+    {
+        static $memoryCache = [];
+
+        $ttlSeconds = max(1, $ttlSeconds);
+
+        if (function_exists('cache')) {
+            return cache()->remember($key, $ttlSeconds, $callback);
+        }
+
+        $now = time();
+        if (isset($memoryCache[$key]) && ($memoryCache[$key]['expires_at'] ?? 0) > $now) {
+            return $memoryCache[$key]['value'];
+        }
+
+        $value = $callback();
+        $memoryCache[$key] = [
+            'expires_at' => $now + $ttlSeconds,
+            'value' => $value,
+        ];
+
+        return $value;
+    }
+}
+
 if (! function_exists('system_monitoring_runtime_cache_default')) {
     function system_monitoring_runtime_cache_default(): array
     {

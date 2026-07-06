@@ -342,6 +342,10 @@ final class UpdateApplyClient
                 continue;
             }
 
+            if ($item === 'php artisan catche:clear') {
+                $item = 'php artisan cache:clear';
+            }
+
             $normalized[] = $item;
         }
 

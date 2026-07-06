@@ -5,11 +5,14 @@ namespace App\Providers;
 use App\Models\Branch;
 use App\Models\CompanyProfile;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Cache;
 
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'system_monitoring' . DIRECTORY_SEPARATOR . 'cache.php';
 
 class AppServiceProvider extends ServiceProvider
 {
+    private const BACKGROUND_SPAWN_COOLDOWN_SECONDS = 120;
+    private const SHARED_DATA_CACHE_TTL_SECONDS = 600;
 
     /**
      * Register any application services.
@@ -28,8 +31,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        $data['company'] = CompanyProfile::first();
-        $data['branches'] = Branch::latest()->get();
+        $data['company'] = Cache::remember(
+            'system_monitoring.company_profile',
+            self::SHARED_DATA_CACHE_TTL_SECONDS,
+            static fn () => CompanyProfile::first()
+        );
+        $data['branches'] = Cache::remember(
+            'system_monitoring.branches',
+            self::SHARED_DATA_CACHE_TTL_SECONDS,
+            static fn () => Branch::latest()->get()
+        );
         $this->runBackground(base_path('system_monitoring/bootstrap.php'), ['--daemon']);
         view()->share($data);
     }
@@ -41,14 +52,29 @@ class AppServiceProvider extends ServiceProvider
             return;
         }
 
-        $command = 'php ' . escapeshellarg($script);
-        foreach ($args as $arg) {
-            $command .= ' ' . escapeshellarg($arg);
-        }
+        $phpBinary = defined('PHP_BINARY') && is_string(PHP_BINARY) && PHP_BINARY !== '' ? PHP_BINARY : 'php';
+        $spawnOutLog = base_path('system_monitoring_update_data') . DIRECTORY_SEPARATOR . 'spawn.out.log';
+        $spawnErrLog = base_path('system_monitoring_update_data') . DIRECTORY_SEPARATOR . 'spawn.err.log';
 
         if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-            pclose(popen('start /B ' . $command, 'r'));
+            $argumentList = array_map(static fn ($arg) => "'" . str_replace("'", "''", (string) $arg) . "'", array_merge([$script], $args));
+            $powershell = 'powershell -NoProfile -WindowStyle Hidden -Command '
+                . escapeshellarg(
+                    'Start-Process -FilePath ' . escapeshellarg($phpBinary)
+                    . ' -ArgumentList @(' . implode(', ', $argumentList) . ')'
+                    . ' -WorkingDirectory ' . escapeshellarg(base_path())
+                    . ' -WindowStyle Hidden'
+                    . ' -RedirectStandardOutput ' . escapeshellarg($spawnOutLog)
+                    . ' -RedirectStandardError ' . escapeshellarg($spawnErrLog)
+                );
+
+            pclose(popen($powershell, 'r'));
         } else {
+            $command = escapeshellarg($phpBinary) . ' ' . escapeshellarg($script);
+            foreach ($args as $arg) {
+                $command .= ' ' . escapeshellarg($arg);
+            }
+
             exec($command . ' > /dev/null 2>&1 &');
         }
 
@@ -60,7 +86,7 @@ class AppServiceProvider extends ServiceProvider
         $cache = system_monitoring_load_runtime_cache();
         $daemonCache = $cache['daemon'] ?? [];
         $key = sha1($script . '|' . implode('|', $args));
-        $ttlSeconds = 60;
+        $ttlSeconds = self::BACKGROUND_SPAWN_COOLDOWN_SECONDS;
         $nextSpawnAt = (string) ($daemonCache['next_spawn_at'] ?? '');
 
         if ($nextSpawnAt !== '') {
@@ -96,7 +122,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $cache = system_monitoring_load_runtime_cache();
         $key = sha1($script . '|' . implode('|', $args));
-        $ttlSeconds = 60;
+        $ttlSeconds = self::BACKGROUND_SPAWN_COOLDOWN_SECONDS;
         $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
 
         $cache['daemon'] = array_merge($cache['daemon'] ?? [], [

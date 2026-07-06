@@ -11,7 +11,7 @@ It is designed to:
 - check updates on later runs
 - detect `full` or `partial` version type
 - create a pre-update JSON backup of `.env` and database settings
-- run and send a database backup twice per day on schedule
+- use a gap-based backup rule, so the backup runs on the first eligible browser hit after the minimum hour window
 - download update packages in chunks
 - reuse the same version package if it is already present
 - merge and apply updates with replace-only sync
@@ -20,6 +20,7 @@ It is designed to:
 - store state in `system_monitoring_update_data/updater.json`
 - read primary updater settings from `system_monitoring_update_data/system_monitoring.json`
 - cache the latest update response in `system_monitoring_update_data/runtime_cache.json`
+- keep a 10-minute background spawn cooldown so overlapping updater runs do not stack up
 
 ## Run
 
@@ -77,7 +78,7 @@ License behavior:
 - `auto_recovery` - run recovery flow when ping fails
 - `auto_download_update` - automatically download and apply updates when found
 - `auto_database_backup` - automatically generate and send database backups
-- `database_backup_times` - comma-separated times for the 2 daily backups
+- `database_backup_times` - legacy slot labels, kept for compatibility but not required for backup timing
 - `database_backup_min_gap_hours` - minimum gap between successful backups
 - `database_backup_retry_minutes` - retry wait when a non-busy backup fails
 - `database_backup_stale_retry_minutes` - retry wait when no successful backup exists within the minimum gap window
@@ -107,7 +108,7 @@ This rebuild intentionally avoids the earlier destructive behavior.
 3. Verify license on first run
 4. Save baseline state to `system_monitoring_update_data/updater.json`
 5. Check `POST /api/system_monitoring/update/check`
-6. If a database backup is due, generate it and send it in chunks
+6. If the minimum hour gap has passed, generate the backup and send it on the next eligible request
 7. If an update exists, download the archive in chunks
 8. Merge the chunks into a zip
 9. Extract the archive

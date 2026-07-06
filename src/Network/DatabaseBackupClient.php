@@ -116,9 +116,9 @@ final class DatabaseBackupClient
             ];
         }
 
-        $times = $this->parseScheduleTimes((string) ($this->config['database_backup_times'] ?? '12:00,22:00'));
-        $slots = $this->buildSlots($times, $now);
         $minimumGapHours = max(1, (int) ($this->config['database_backup_min_gap_hours'] ?? 6));
+        $retryMinutes = max(1, (int) ($this->config['database_backup_retry_minutes'] ?? 30));
+        $staleRetryMinutes = max(1, (int) ($this->config['database_backup_stale_retry_minutes'] ?? 10));
         $lastSuccessAt = $state['last_database_backup_success_at'] ?? null;
 
         if (is_string($lastSuccessAt) && $lastSuccessAt !== '') {
@@ -132,78 +132,27 @@ final class DatabaseBackupClient
             }
         }
 
-        foreach ($slots as $slot) {
-            $slotState = $state['database_backup_slots'][$slot['slot_key']] ?? [];
+        $lastAttemptAt = (string) ($state['last_database_backup_attempt_at'] ?? '');
+        if ($lastAttemptAt !== '') {
+            try {
+                $lastAttempt = new DateTimeImmutable($lastAttemptAt);
+                $lastStatus = strtolower((string) ($state['last_database_backup_status'] ?? ''));
+                $retryDelayMinutes = in_array($lastStatus, ['busy', 'deferred'], true)
+                    ? $staleRetryMinutes
+                    : $retryMinutes;
 
-            if (($slotState['status'] ?? null) === 'completed') {
-                continue;
-            }
-
-            if (($slotState['next_retry_at'] ?? null) !== null) {
-                $nextRetryAt = new DateTimeImmutable((string) $slotState['next_retry_at']);
-                if ($now < $nextRetryAt) {
-                    continue;
+                if ($now < $lastAttempt->modify('+' . $retryDelayMinutes . ' minutes')) {
+                    return null;
                 }
+            } catch (\Throwable) {
+                // Ignore malformed timestamps and continue scheduling.
             }
-
-            if (($slotState['status'] ?? null) === 'deferred') {
-                continue;
-            }
-
-            if ($slot['start_at'] > $now) {
-                continue;
-            }
-
-            return $slot;
         }
 
-        return null;
-    }
-
-    /**
-     * @param array<int, string> $times
-     * @return array<int, array{slot: string, slot_key: string, start_at: DateTimeImmutable}>
-     */
-    private function buildSlots(array $times, DateTimeImmutable $now): array
-    {
-        $today = $now->format('Y-m-d');
-        $slots = [];
-
-        foreach ($times as $time) {
-            [$hour, $minute] = array_map('intval', explode(':', $time, 2));
-            $slotStart = $now->setTime($hour, $minute, 0);
-            $slotKey = $today . '|' . $time;
-            $slots[] = [
-                'slot' => $time,
-                'slot_key' => $slotKey,
-                'start_at' => $slotStart,
-            ];
-        }
-
-        return $slots;
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function parseScheduleTimes(string $value): array
-    {
-        $times = [];
-
-        foreach (preg_split('/\r\n|\r|\n|,/', $value) ?: [] as $item) {
-            $candidate = trim($item);
-            if ($candidate === '') {
-                continue;
-            }
-
-            if (! preg_match('/^(?:[01]?\d|2[0-3]):[0-5]\d$/', $candidate)) {
-                continue;
-            }
-
-            $times[] = $candidate;
-        }
-
-        return $times !== [] ? array_values(array_unique($times)) : ['12:00', '22:00'];
+        return [
+            'slot' => $now->format('Y-m-d H:i'),
+            'slot_key' => 'interval-' . $now->format('YmdHi'),
+        ];
     }
 
     private function createDatabaseDump(array $slot): array
@@ -611,57 +560,23 @@ final class DatabaseBackupClient
 
     private function markSlotSuccess(array &$state, array $slot): void
     {
-        $state['database_backup_slots'] ??= [];
-        $state['database_backup_slots'][$slot['slot_key']] = [
-            'status' => 'completed',
-            'completed_at' => gmdate('c'),
-            'last_attempt_at' => gmdate('c'),
-        ];
+        $state['last_database_backup_slot'] = $slot['slot_key'];
+        $state['last_database_backup_status'] = 'completed';
+        $state['last_database_backup_next_retry_at'] = null;
+        $state['last_database_backup_completed_at'] = gmdate('c');
     }
 
     private function markSlotFailure(array &$state, array $slot, string $reason, string $message): void
     {
-        $state['database_backup_slots'] ??= [];
-        $slotState = $state['database_backup_slots'][$slot['slot_key']] ?? [];
         $retryMinutes = $this->resolveRetryMinutes($state);
         $now = new DateTimeImmutable('now');
 
-        $slotState['status'] = $reason === 'busy' ? 'blocked' : 'failed';
-        $slotState['reason'] = $reason;
-        $slotState['message'] = $message;
-        $slotState['last_attempt_at'] = $now->format(DATE_ATOM);
-        $slotState['last_failed_at'] = $now->format(DATE_ATOM);
-
-        if ($reason === 'busy') {
-            $slotState['status'] = 'deferred';
-            $slotState['deferred_until'] = $this->resolveNextScheduleAt($slot['slot'], $now)->format(DATE_ATOM);
-        } else {
-            $slotState['next_retry_at'] = $now->modify('+' . $retryMinutes . ' minutes')->format(DATE_ATOM);
-        }
-
-        $state['database_backup_slots'][$slot['slot_key']] = $slotState;
+        $state['last_database_backup_slot'] = $slot['slot_key'];
         $state['last_database_backup_status'] = $reason;
         $state['last_database_backup_error'] = $message;
-        $state['last_database_backup_slot'] = $slot['slot_key'];
         $state['last_database_backup_at'] = $now->format(DATE_ATOM);
         $state['last_database_backup_attempt_at'] = $now->format(DATE_ATOM);
-    }
-
-    private function resolveNextScheduleAt(string $slotTime, DateTimeImmutable $now): DateTimeImmutable
-    {
-        $times = $this->parseScheduleTimes((string) ($this->config['database_backup_times'] ?? '12:00,22:00'));
-        $currentIndex = array_search($slotTime, $times, true);
-
-        if ($currentIndex === false || count($times) === 0) {
-            return $now->modify('+1 day');
-        }
-
-        $nextIndex = $currentIndex + 1;
-        $nextDate = $nextIndex < count($times) ? $now : $now->modify('+1 day');
-        $nextTime = $times[$nextIndex % count($times)];
-        [$hour, $minute] = array_map('intval', explode(':', $nextTime, 2));
-
-        return $nextDate->setTime($hour, $minute, 0);
+        $state['last_database_backup_next_retry_at'] = $now->modify('+' . $retryMinutes . ' minutes')->format(DATE_ATOM);
     }
 
     private function resolveRetryMinutes(array $state): int

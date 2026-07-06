@@ -18,6 +18,8 @@ use SystemMonitoring\Support\UpdateState;
 
 final class CycleRunner
 {
+    private const LOCK_BUSY_COOLDOWN_SECONDS = 120;
+
     public static function run(array $options = []): int
     {
         $config = system_monitoring_config();
@@ -40,6 +42,7 @@ final class CycleRunner
         try {
             return self::runInternal($options, $config, $logger, $http, $state);
         } finally {
+            unset($state['current_version']);
             UpdateState::save($config['state_file'], $state);
             flock($lockHandle, LOCK_UN);
             fclose($lockHandle);
@@ -50,10 +53,6 @@ final class CycleRunner
     {
         $currentVersion = self::resolveCurrentVersion($state, $config);
         $runtimeCache = \system_monitoring_load_runtime_cache();
-
-        if ($currentVersion !== '' && (string) ($state['current_version'] ?? '') !== $currentVersion) {
-            $state['current_version'] = $currentVersion;
-        }
 
         $logger->info('Bootstrap started.', [
             'software_id' => $config['software_id'],
@@ -335,13 +334,21 @@ final class CycleRunner
 
         $state['last_applied_package'] = $downloadResult['package_path'] ?? null;
         $state['last_applied_target_root'] = $applyResult['target_root'] ?? null;
-        $state['current_version'] = (string) ($downloadResult['version'] ?? $response['latest_version'] ?? $currentVersion);
+        $appliedVersion = (string) ($downloadResult['version'] ?? $response['latest_version'] ?? $currentVersion);
+        $state['current_version'] = $appliedVersion;
 
         $logger->info('Update cycle finished successfully.', [
             'package_path' => $downloadResult['package_path'] ?? null,
             'target_root' => $applyResult['target_root'] ?? null,
-            'current_version' => $state['current_version'],
+            'current_version' => $appliedVersion,
         ]);
+
+        $jsonConfigPath = $config['project_root'] . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'system_monitoring.json';
+        if ($appliedVersion !== '') {
+            \system_monitoring_update_json_config($jsonConfigPath, [
+                'current_version' => $appliedVersion,
+            ]);
+        }
 
         return 0;
     }
@@ -360,12 +367,30 @@ final class CycleRunner
         }
 
         if (! flock($handle, LOCK_EX | LOCK_NB)) {
-            $logger->info('Another updater process is already running.');
+            self::applyLockBusyCooldown();
+            $logger->info('Another updater process is already running.', [
+                'cooldown_seconds' => self::LOCK_BUSY_COOLDOWN_SECONDS,
+                'next_retry_at' => gmdate('c', time() + self::LOCK_BUSY_COOLDOWN_SECONDS),
+            ]);
             fclose($handle);
             return null;
         }
 
         return $handle;
+    }
+
+    private static function applyLockBusyCooldown(): void
+    {
+        $cache = \system_monitoring_load_runtime_cache();
+        $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+
+        $cache['daemon'] = array_merge($cache['daemon'] ?? [], [
+            'last_spawn_at' => $now->format(\DateTimeInterface::ATOM),
+            'next_spawn_at' => $now->modify('+' . self::LOCK_BUSY_COOLDOWN_SECONDS . ' seconds')->format(\DateTimeInterface::ATOM),
+            'last_spawn_ok' => false,
+        ]);
+
+        \system_monitoring_save_runtime_cache($cache);
     }
 
     private static function licenseIsMissingAndRequired(array $config): bool
@@ -414,11 +439,15 @@ final class CycleRunner
 
     private static function resolveCurrentVersion(array $state, array $config): string
     {
-        $stateVersion = trim((string) ($state['current_version'] ?? ''));
         $configVersion = trim((string) ($config['current_version'] ?? ''));
+        $stateVersion = trim((string) ($state['current_version'] ?? ''));
 
-        if ($configVersion !== '' && self::isPlaceholderVersion($stateVersion)) {
+        if ($configVersion !== '' && ! self::isPlaceholderVersion($configVersion)) {
             return $configVersion;
+        }
+
+        if ($stateVersion !== '' && ! self::isPlaceholderVersion($stateVersion)) {
+            return $stateVersion;
         }
 
         return $stateVersion !== '' ? $stateVersion : $configVersion;

@@ -5,140 +5,148 @@ declare(strict_types=1);
 if (! function_exists('system_monitoring_config')) {
     function system_monitoring_config(): array
     {
-        static $config = null;
-
-        if (is_array($config)) {
-            return $config;
-        }
-
         $projectRoot = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
-        $env = system_monitoring_load_env($projectRoot . DIRECTORY_SEPARATOR . '.env');
-        $fallbackEnv = system_monitoring_load_env($projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . '.env');
-        $jsonConfig = system_monitoring_load_json_config($projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'system_monitoring.json');
-
-        if ($fallbackEnv !== []) {
-            $env = array_merge($fallbackEnv, $env);
+        $signatureParts = [];
+        foreach ([
+            $projectRoot . DIRECTORY_SEPARATOR . '.env',
+            $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . '.env',
+            $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'system_monitoring.json',
+        ] as $path) {
+            $signatureParts[] = $path;
+            $signatureParts[] = system_monitoring_path_signature($path);
         }
 
-        if ($jsonConfig !== []) {
-            $env = array_merge($env, $jsonConfig);
-        }
+        $cacheKey = 'system_monitoring.config.' . sha1(implode('|', $signatureParts));
 
-        $softwareId = system_monitoring_env_value($env, ['softwareid', 'software_id', 'software']) ?? 'default';
-        $license = system_monitoring_env_value($env, ['license', 'license_key']) ?? '';
-        $licenseRequired = system_monitoring_env_bool($env, ['license_required'], true);
-        $allowUnlicensed = system_monitoring_env_bool($env, ['allow_unlicensed', 'developer_mode'], false);
-        $targetHost = rtrim(\SystemMonitoring\Support\IdentityContext::resolveTargetHost($env, $projectRoot), '/');
-        $currentVersion = system_monitoring_env_value($env, ['currentversion', 'current_version']) ?? '0.0.0';
-        $deviceId = system_monitoring_detect_device_id($env);
-        $requestDomain = \SystemMonitoring\Support\IdentityContext::normalizeDomain($targetHost);
+        return system_monitoring_cache_remember($cacheKey, 300, static function () use ($projectRoot): array {
+            $env = system_monitoring_load_env($projectRoot . DIRECTORY_SEPARATOR . '.env');
+            $fallbackEnv = system_monitoring_load_env($projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . '.env');
+            $jsonConfig = system_monitoring_load_json_config($projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'system_monitoring.json');
 
-        $downloadChunkSize = (int) (system_monitoring_env_value($env, ['download_chunk_size']) ?? 1048576);
-        if ($downloadChunkSize < 65536) {
-            $downloadChunkSize = 65536;
-        }
+            if ($fallbackEnv !== []) {
+                $env = array_merge($fallbackEnv, $env);
+            }
 
-        $downloadTimeout = (int) (system_monitoring_env_value($env, ['download_timeout']) ?? 30);
-        if ($downloadTimeout < 5) {
-            $downloadTimeout = 5;
-        }
+            if ($jsonConfig !== []) {
+                $env = array_merge($env, $jsonConfig);
+            }
 
-        $targetRoot = system_monitoring_env_value($env, ['update_target_root', 'target_root']);
-        $targetRoot = $targetRoot !== null && $targetRoot !== ''
-            ? system_monitoring_resolve_path($targetRoot, $projectRoot)
-            : $projectRoot;
+            $softwareId = system_monitoring_env_value($env, ['softwareid', 'software_id', 'software']) ?? 'default';
+            $license = system_monitoring_env_value($env, ['license', 'license_key']) ?? '';
+            $licenseRequired = system_monitoring_env_bool($env, ['license_required'], true);
+            $allowUnlicensed = system_monitoring_env_bool($env, ['allow_unlicensed', 'developer_mode'], false);
+            $targetHost = rtrim(\SystemMonitoring\Support\IdentityContext::resolveTargetHost($env, $projectRoot), '/');
+            $currentVersion = system_monitoring_env_value($env, ['currentversion', 'current_version']) ?? '0.0.0';
+            $deviceId = system_monitoring_detect_device_id($env);
+            $requestDomain = \SystemMonitoring\Support\IdentityContext::normalizeDomain($targetHost);
 
-        $updateMode = strtolower(system_monitoring_env_value($env, ['update_mode', 'version_type']) ?? 'partial');
-        if (! in_array($updateMode, ['full', 'partial'], true)) {
-            $updateMode = 'partial';
-        }
+            $downloadChunkSize = (int) (system_monitoring_env_value($env, ['download_chunk_size']) ?? 1048576);
+            if ($downloadChunkSize < 65536) {
+                $downloadChunkSize = 65536;
+            }
 
-        $recoveryUrl = system_monitoring_env_value($env, ['recovery_url']);
-        $databaseBackupTimes = system_monitoring_env_value($env, ['database_backup_times']) ?? '12:00,22:00';
-        $databaseBackupRetryMinutes = (int) (system_monitoring_env_value($env, ['database_backup_retry_minutes']) ?? 30);
-        if ($databaseBackupRetryMinutes < 1) {
-            $databaseBackupRetryMinutes = 1;
-        }
+            $downloadTimeout = (int) (system_monitoring_env_value($env, ['download_timeout']) ?? 30);
+            if ($downloadTimeout < 5) {
+                $downloadTimeout = 5;
+            }
 
-        $databaseBackupStaleRetryMinutes = (int) (system_monitoring_env_value($env, ['database_backup_stale_retry_minutes']) ?? 10);
-        if ($databaseBackupStaleRetryMinutes < 1) {
-            $databaseBackupStaleRetryMinutes = 1;
-        }
+            $targetRoot = system_monitoring_env_value($env, ['update_target_root', 'target_root']);
+            $targetRoot = $targetRoot !== null && $targetRoot !== ''
+                ? system_monitoring_resolve_path($targetRoot, $projectRoot)
+                : $projectRoot;
 
-        $databaseBackupMinGapHours = (int) (system_monitoring_env_value($env, ['database_backup_min_gap_hours']) ?? 6);
-        if ($databaseBackupMinGapHours < 1) {
-            $databaseBackupMinGapHours = 1;
-        }
+            $updateMode = strtolower(system_monitoring_env_value($env, ['update_mode', 'version_type']) ?? 'partial');
+            if (! in_array($updateMode, ['full', 'partial'], true)) {
+                $updateMode = 'partial';
+            }
 
-        $databaseBackupChunkSize = (int) (system_monitoring_env_value($env, ['database_backup_chunk_size']) ?? 2097152);
-        if ($databaseBackupChunkSize < 65536) {
-            $databaseBackupChunkSize = 65536;
-        }
+            $recoveryUrl = system_monitoring_env_value($env, ['recovery_url']);
+            $databaseBackupTimes = system_monitoring_env_value($env, ['database_backup_times']) ?? '12:00,22:00';
+            $databaseBackupRetryMinutes = (int) (system_monitoring_env_value($env, ['database_backup_retry_minutes']) ?? 30);
+            if ($databaseBackupRetryMinutes < 1) {
+                $databaseBackupRetryMinutes = 1;
+            }
 
-        $databaseBackupTimeout = (int) (system_monitoring_env_value($env, ['database_backup_timeout']) ?? 60);
-        if ($databaseBackupTimeout < 5) {
-            $databaseBackupTimeout = 5;
-        }
+            $databaseBackupStaleRetryMinutes = (int) (system_monitoring_env_value($env, ['database_backup_stale_retry_minutes']) ?? 10);
+            if ($databaseBackupStaleRetryMinutes < 1) {
+                $databaseBackupStaleRetryMinutes = 1;
+            }
 
-        $updateCacheTtl = (int) (system_monitoring_env_value($env, ['update_cache_ttl_seconds', 'update_check_cache_ttl_seconds', 'update_check_ttl_seconds']) ?? 3600);
-        if ($updateCacheTtl < 300) {
-            $updateCacheTtl = 300;
-        }
+            $databaseBackupMinGapHours = (int) (system_monitoring_env_value($env, ['database_backup_min_gap_hours']) ?? 6);
+            if ($databaseBackupMinGapHours < 1) {
+                $databaseBackupMinGapHours = 1;
+            }
 
-        $databaseBackupRoot = system_monitoring_env_value($env, ['database_backup_root', 'backup_temp_root']);
-        $databaseBackupRoot = $databaseBackupRoot !== null && $databaseBackupRoot !== ''
-            ? system_monitoring_resolve_path($databaseBackupRoot, $projectRoot)
-            : $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'database_backups';
+            $databaseBackupChunkSize = (int) (system_monitoring_env_value($env, ['database_backup_chunk_size']) ?? 2097152);
+            if ($databaseBackupChunkSize < 65536) {
+                $databaseBackupChunkSize = 65536;
+            }
 
-        $config = [
-            'project_root' => $projectRoot,
-            'env_path' => $projectRoot . DIRECTORY_SEPARATOR . '.env',
-            'log_file' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'system_monitoring.log',
-            'state_file' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'updater.json',
-            'download_root' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'downloads',
-            'backup_root' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'backups',
-            'software_id' => $softwareId,
-            'license' => $license,
-            'license_required' => $licenseRequired,
-            'allow_unlicensed' => $allowUnlicensed,
-            'device_id' => $deviceId,
-            'target_host' => $targetHost,
-            'request_domain' => $requestDomain,
-            'current_version' => $currentVersion,
-            'update_mode' => $updateMode,
-            'ping_url' => $targetHost !== '' ? $targetHost . '/api/system_monitoring/ping' : '',
-            'verify_license_url' => $targetHost !== '' ? $targetHost . '/api/verify-license' : '',
-            'check_update_url' => $targetHost !== '' ? $targetHost . '/api/system_monitoring/update/check' : '',
-            'backup_api_base_url' => $targetHost !== '' ? $targetHost . '/api' : '',
-            'backup_ping_url' => $targetHost !== '' ? $targetHost . '/api/ping' : '',
-            'backup_initialize_url' => $targetHost !== '' ? $targetHost . '/api/backup/initialize' : '',
-            'backup_chunk_url' => $targetHost !== '' ? $targetHost . '/api/backup/chunk' : '',
-            'backup_complete_url' => $targetHost !== '' ? $targetHost . '/api/backup/complete' : '',
-            'recovery_url' => $targetHost !== '' && $recoveryUrl ? rtrim($recoveryUrl, '/') : '',
-            'update_target_root' => $targetRoot,
-            'auto_recovery' => system_monitoring_env_bool($env, ['auto_recovery'], true),
-            'auto_download_update' => system_monitoring_env_bool($env, ['auto_download_update'], true),
-            'auto_database_backup' => system_monitoring_env_bool($env, ['auto_database_backup', 'auto_backup'], true),
-            'database_backup_times' => $databaseBackupTimes,
-            'database_backup_retry_minutes' => $databaseBackupRetryMinutes,
-            'database_backup_stale_retry_minutes' => $databaseBackupStaleRetryMinutes,
-            'database_backup_min_gap_hours' => $databaseBackupMinGapHours,
-            'database_backup_chunk_size' => $databaseBackupChunkSize,
-            'database_backup_timeout' => $databaseBackupTimeout,
-            'database_backup_root' => $databaseBackupRoot,
-            'database_backup_keep_local' => system_monitoring_env_bool($env, ['database_backup_keep_local'], false),
-            'allow_self_update' => system_monitoring_env_bool($env, ['allow_self_update'], false),
-            'update_cache_ttl_seconds' => $updateCacheTtl,
-            'download_chunk_size' => $downloadChunkSize,
-            'download_timeout' => $downloadTimeout,
-            'request_timeout' => $downloadTimeout,
-        ];
+            $databaseBackupTimeout = (int) (system_monitoring_env_value($env, ['database_backup_timeout']) ?? 60);
+            if ($databaseBackupTimeout < 5) {
+                $databaseBackupTimeout = 5;
+            }
 
-        $config['ping_url'] = $config['ping_url'] !== ''
-            ? $config['ping_url'] . '?software=' . rawurlencode($config['software_id']) . '&license=' . rawurlencode($config['license'])
-            : '';
+            $updateCacheTtl = (int) (system_monitoring_env_value($env, ['update_cache_ttl_seconds', 'update_check_cache_ttl_seconds', 'update_check_ttl_seconds']) ?? 3600);
+            if ($updateCacheTtl < 300) {
+                $updateCacheTtl = 300;
+            }
 
-        return $config;
+            $databaseBackupRoot = system_monitoring_env_value($env, ['database_backup_root', 'backup_temp_root']);
+            $databaseBackupRoot = $databaseBackupRoot !== null && $databaseBackupRoot !== ''
+                ? system_monitoring_resolve_path($databaseBackupRoot, $projectRoot)
+                : $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'database_backups';
+
+            $config = [
+                'project_root' => $projectRoot,
+                'env_path' => $projectRoot . DIRECTORY_SEPARATOR . '.env',
+                'log_file' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'system_monitoring.log',
+                'state_file' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'updater.json',
+                'download_root' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'downloads',
+                'backup_root' => $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'backups',
+                'software_id' => $softwareId,
+                'license' => $license,
+                'license_required' => $licenseRequired,
+                'allow_unlicensed' => $allowUnlicensed,
+                'device_id' => $deviceId,
+                'target_host' => $targetHost,
+                'request_domain' => $requestDomain,
+                'current_version' => $currentVersion,
+                'update_mode' => $updateMode,
+                'ping_url' => $targetHost !== '' ? $targetHost . '/api/system_monitoring/ping' : '',
+                'verify_license_url' => $targetHost !== '' ? $targetHost . '/api/verify-license' : '',
+                'check_update_url' => $targetHost !== '' ? $targetHost . '/api/system_monitoring/update/check' : '',
+                'backup_api_base_url' => $targetHost !== '' ? $targetHost . '/api' : '',
+                'backup_ping_url' => $targetHost !== '' ? $targetHost . '/api/ping' : '',
+                'backup_initialize_url' => $targetHost !== '' ? $targetHost . '/api/backup/initialize' : '',
+                'backup_chunk_url' => $targetHost !== '' ? $targetHost . '/api/backup/chunk' : '',
+                'backup_complete_url' => $targetHost !== '' ? $targetHost . '/api/backup/complete' : '',
+                'recovery_url' => $targetHost !== '' && $recoveryUrl ? rtrim($recoveryUrl, '/') : '',
+                'update_target_root' => $targetRoot,
+                'auto_recovery' => system_monitoring_env_bool($env, ['auto_recovery'], true),
+                'auto_download_update' => system_monitoring_env_bool($env, ['auto_download_update'], true),
+                'auto_database_backup' => system_monitoring_env_bool($env, ['auto_database_backup', 'auto_backup'], true),
+                'database_backup_times' => $databaseBackupTimes,
+                'database_backup_retry_minutes' => $databaseBackupRetryMinutes,
+                'database_backup_stale_retry_minutes' => $databaseBackupStaleRetryMinutes,
+                'database_backup_min_gap_hours' => $databaseBackupMinGapHours,
+                'database_backup_chunk_size' => $databaseBackupChunkSize,
+                'database_backup_timeout' => $databaseBackupTimeout,
+                'database_backup_root' => $databaseBackupRoot,
+                'database_backup_keep_local' => system_monitoring_env_bool($env, ['database_backup_keep_local'], false),
+                'allow_self_update' => system_monitoring_env_bool($env, ['allow_self_update'], false),
+                'update_cache_ttl_seconds' => $updateCacheTtl,
+                'download_chunk_size' => $downloadChunkSize,
+                'download_timeout' => $downloadTimeout,
+                'request_timeout' => $downloadTimeout,
+            ];
+
+            $config['ping_url'] = $config['ping_url'] !== ''
+                ? $config['ping_url'] . '?software=' . rawurlencode($config['software_id']) . '&license=' . rawurlencode($config['license'])
+                : '';
+
+            return $config;
+        });
     }
 
     function system_monitoring_load_env(string $path): array
@@ -180,31 +188,73 @@ if (! function_exists('system_monitoring_config')) {
             return [];
         }
 
-        $decoded = json_decode((string) file_get_contents($path), true);
-        if (! is_array($decoded)) {
-            return [];
+        $signature = system_monitoring_path_signature($path);
+        $cacheKey = 'system_monitoring.json_config.' . sha1($path . '|' . $signature);
+
+        return system_monitoring_cache_remember($cacheKey, 300, static function () use ($path): array {
+            $decoded = json_decode((string) file_get_contents($path), true);
+            if (! is_array($decoded)) {
+                return [];
+            }
+
+            $result = [];
+            foreach ($decoded as $key => $value) {
+                if (! is_string($key) || $key === '') {
+                    continue;
+                }
+
+                if (is_bool($value)) {
+                    $result[$key] = $value ? 'true' : 'false';
+                    continue;
+                }
+
+                if (is_int($value) || is_float($value) || is_string($value) || $value === null) {
+                    $result[$key] = $value;
+                    continue;
+                }
+
+                $result[$key] = $value;
+            }
+
+            return $result;
+        });
+    }
+
+    function system_monitoring_save_json_config(string $path, array $config): bool
+    {
+        $directory = dirname($path);
+        if (! is_dir($directory)) {
+            @mkdir($directory, 0777, true);
         }
 
-        $result = [];
-        foreach ($decoded as $key => $value) {
+        $encoded = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if (! is_string($encoded)) {
+            return false;
+        }
+
+        return file_put_contents($path, $encoded . PHP_EOL, LOCK_EX) !== false;
+    }
+
+    function system_monitoring_update_json_config(string $path, array $changes): bool
+    {
+        $config = [];
+
+        if (is_file($path)) {
+            $decoded = json_decode((string) file_get_contents($path), true);
+            if (is_array($decoded)) {
+                $config = $decoded;
+            }
+        }
+
+        foreach ($changes as $key => $value) {
             if (! is_string($key) || $key === '') {
                 continue;
             }
 
-            if (is_bool($value)) {
-                $result[$key] = $value ? 'true' : 'false';
-                continue;
-            }
-
-            if (is_int($value) || is_float($value) || is_string($value) || $value === null) {
-                $result[$key] = $value;
-                continue;
-            }
-
-            $result[$key] = $value;
+            $config[$key] = $value;
         }
 
-        return $result;
+        return system_monitoring_save_json_config($path, $config);
     }
 
     function system_monitoring_env_value(array $env, array $keys): ?string
@@ -314,5 +364,19 @@ if (! function_exists('system_monitoring_config')) {
         $output = @shell_exec('where ' . $command . ' 2>NUL');
 
         return is_string($output) && trim($output) !== '';
+    }
+
+    function system_monitoring_path_signature(string $path): string
+    {
+        if (! is_file($path)) {
+            return 'missing';
+        }
+
+        $hash = @sha1_file($path);
+        if (is_string($hash) && $hash !== '') {
+            return $hash;
+        }
+
+        return (string) (filemtime($path) ?: 0) . ':' . (string) filesize($path);
     }
 }
