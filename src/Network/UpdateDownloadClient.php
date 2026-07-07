@@ -89,6 +89,7 @@ final class UpdateDownloadClient
                 'range' => $totalSize > 0 ? ($start . '-' . $end) : null,
                 'download_to' => $chunkPath,
                 'expect_json' => false,
+                'verify_ssl' => (bool) ($this->config['verify_ssl'] ?? true),
             ]);
 
             if (! ($response['ok'] ?? false)) {
@@ -181,6 +182,7 @@ final class UpdateDownloadClient
         $response = $this->http->request('HEAD', $url, [
             'timeout' => $this->config['download_timeout'] ?? 30,
             'expect_json' => false,
+            'verify_ssl' => (bool) ($this->config['verify_ssl'] ?? true),
         ]);
 
         if (isset($response['headers']['content-length'])) {

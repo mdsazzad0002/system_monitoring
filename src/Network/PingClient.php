@@ -27,12 +27,14 @@ final class PingClient
 
         $response = $this->http->request('GET', $this->config['ping_url'], [
             'timeout' => $this->config['request_timeout'] ?? 30,
+            'verify_ssl' => (bool) ($this->config['verify_ssl'] ?? true),
         ]);
 
         if (! $response['ok'] && (int) ($response['status'] ?? 0) >= 500) {
             usleep(250000);
             $retry = $this->http->request('GET', $this->config['ping_url'], [
                 'timeout' => $this->config['request_timeout'] ?? 30,
+                'verify_ssl' => (bool) ($this->config['verify_ssl'] ?? true),
             ]);
 
             if ($retry['ok']) {

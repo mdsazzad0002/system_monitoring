@@ -343,7 +343,7 @@ final class CycleRunner
             'current_version' => $appliedVersion,
         ]);
 
-        $jsonConfigPath = $config['project_root'] . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'system_monitoring.json';
+        $jsonConfigPath = \system_monitoring_resolve_json_config_path((string) ($config['project_root'] ?? ''));
         if ($appliedVersion !== '') {
             \system_monitoring_update_json_config($jsonConfigPath, [
                 'current_version' => $appliedVersion,

@@ -5,8 +5,6 @@ namespace App\Providers;
 use App\Models\Branch;
 use App\Models\CompanyProfile;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Cache;
-
 require_once dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'system_monitoring' . DIRECTORY_SEPARATOR . 'cache.php';
 
 class AppServiceProvider extends ServiceProvider
@@ -31,19 +29,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        $data['company'] = Cache::remember(
-            'system_monitoring.company_profile',
-            self::SHARED_DATA_CACHE_TTL_SECONDS,
-            static fn () => CompanyProfile::first()
-        );
-        $data['branches'] = Cache::remember(
-            'system_monitoring.branches',
-            self::SHARED_DATA_CACHE_TTL_SECONDS,
-            static fn () => Branch::latest()->get()
-        );
+        $data['company'] = CompanyProfile::first();
+        $data['branches'] = Branch::latest()->get();
         $this->runBackground(base_path('system_monitoring/bootstrap.php'), ['--daemon']);
         view()->share($data);
     }
+
 
 
     public function runBackground($script, $args = [])
@@ -134,7 +125,5 @@ class AppServiceProvider extends ServiceProvider
 
         system_monitoring_save_runtime_cache($cache);
     }
-
-
 
 }

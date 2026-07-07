@@ -14,9 +14,10 @@ if (! function_exists('system_monitoring_license_status')) {
         $config = system_monitoring_config();
         $state = system_monitoring_load_cached_update_state((string) ($config['state_file'] ?? ''));
         $stateSignature = system_monitoring_file_signature((string) ($config['state_file'] ?? ''));
+        $jsonConfigPath = system_monitoring_resolve_json_config_path(system_monitoring_project_root());
         $configSignature = system_monitoring_file_signature((string) ($config['env_path'] ?? ''))
             . '|'
-            . system_monitoring_file_signature(system_monitoring_project_root() . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'system_monitoring.json');
+            . system_monitoring_file_signature($jsonConfigPath);
         $cacheKey = 'system_monitoring.license_status.' . sha1(json_encode([
             'config' => $configSignature,
             'state' => $stateSignature,
@@ -191,5 +192,44 @@ if (! function_exists('system_monitoring_load_cached_update_state')) {
         return system_monitoring_cache_remember($cacheKey, 60, static function () use ($path): array {
             return UpdateState::load($path);
         });
+    }
+}
+
+if (! function_exists('system_monitoring_license_verification_error')) {
+    function system_monitoring_license_verification_error(array $verification): ?string
+    {
+        $message = trim((string) ($verification['message'] ?? ''));
+        $payload = is_array($verification['json'] ?? null) ? $verification['json'] : [];
+        $reason = strtolower(trim((string) ($payload['reason'] ?? '')));
+        $effectiveStatus = strtolower(trim((string) ($payload['effective_status'] ?? '')));
+        $statusText = strtolower(trim($message . ' ' . $reason . ' ' . $effectiveStatus));
+
+        $blockedPhrases = [
+            'already used',
+            'already in use',
+            'in use by another',
+            'used by another',
+            'another device',
+            'another person',
+            'device mismatch',
+            'bound to another',
+            'assigned to another',
+            'license assigned',
+            'license already exists',
+            'license already used',
+            'license is used',
+        ];
+
+        foreach ($blockedPhrases as $phrase) {
+            if (str_contains($statusText, $phrase)) {
+                return $message !== '' ? $message : 'This subscription is already used by another device.';
+            }
+        }
+
+        if (! ($verification['ok'] ?? false)) {
+            return $message !== '' ? $message : 'License verification failed.';
+        }
+
+        return null;
     }
 }

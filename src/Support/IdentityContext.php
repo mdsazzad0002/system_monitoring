@@ -52,6 +52,32 @@ final class IdentityContext
         return $domain !== '' ? $domain : null;
     }
 
+    public static function normalizeRequestDomain(?string $value): ?string
+    {
+        $normalized = self::normalizeNullable($value);
+        if ($normalized === null) {
+            return null;
+        }
+
+        $candidate = str_contains($normalized, '://') ? $normalized : 'https://' . $normalized;
+        $host = parse_url($candidate, PHP_URL_HOST);
+        if (! is_string($host) || $host === '') {
+            return null;
+        }
+
+        $host = trim(strtolower($host), '.');
+        if ($host === '') {
+            return null;
+        }
+
+        $port = parse_url($candidate, PHP_URL_PORT);
+        if (is_int($port) && $port > 0) {
+            return $host . ':' . $port;
+        }
+
+        return $host;
+    }
+
     public static function isLocalHost(string $host): bool
     {
         $host = strtolower(trim($host, '.'));

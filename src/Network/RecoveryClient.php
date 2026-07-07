@@ -37,6 +37,7 @@ final class RecoveryClient
             'timeout' => $this->config['request_timeout'] ?? 30,
             'headers' => ['Content-Type: application/x-www-form-urlencoded'],
             'body' => http_build_query($payload),
+            'verify_ssl' => (bool) ($this->config['verify_ssl'] ?? true),
         ]);
 
         return [

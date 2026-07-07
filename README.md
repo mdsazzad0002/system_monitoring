@@ -18,7 +18,7 @@ It is designed to:
 - clean downloaded zip and temp folders after apply
 - write a complete run log to a day-wise file like `system_monitoring_update_data/system_monitoring-YYYY-MM-DD.log`
 - store state in `system_monitoring_update_data/updater.json`
-- read primary updater settings from `system_monitoring_update_data/system_monitoring.json`
+- read primary updater settings from `system_monitoring/system_monitoring.json`, with `system_monitoring_update_data/system_monitoring.json` as fallback
 - cache the latest update response in `system_monitoring_update_data/runtime_cache.json`
 - keep a 10-minute background spawn cooldown so overlapping updater runs do not stack up
 

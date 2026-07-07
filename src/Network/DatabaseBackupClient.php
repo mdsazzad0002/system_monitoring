@@ -347,6 +347,10 @@ final class DatabaseBackupClient
             '--result-file=' . escapeshellarg($filePath),
         ];
 
+        if ((bool) ($this->config['database_backup_disable_column_statistics'] ?? true)) {
+            $command[] = '--column-statistics=0';
+        }
+
         if ($password !== '') {
             $command[] = '--password=' . escapeshellarg($password);
         }
@@ -421,6 +425,7 @@ final class DatabaseBackupClient
             'timeout' => $timeout,
             'headers' => ['Content-Type: application/x-www-form-urlencoded'],
             'body' => http_build_query($initializePayload),
+            'verify_ssl' => (bool) ($this->config['verify_ssl'] ?? true),
         ]);
 
         if (! ($initialize['ok'] ?? false)) {
@@ -465,6 +470,7 @@ final class DatabaseBackupClient
                     'timeout' => $timeout,
                     'headers' => ['Content-Type: application/x-www-form-urlencoded'],
                     'body' => http_build_query($chunkPayload),
+                    'verify_ssl' => (bool) ($this->config['verify_ssl'] ?? true),
                 ]);
 
                 if (! ($chunkResponse['ok'] ?? false)) {
@@ -501,6 +507,7 @@ final class DatabaseBackupClient
             'timeout' => $timeout,
             'headers' => ['Content-Type: application/x-www-form-urlencoded'],
             'body' => http_build_query($completePayload),
+            'verify_ssl' => (bool) ($this->config['verify_ssl'] ?? true),
         ]);
 
         if (! ($complete['ok'] ?? false)) {

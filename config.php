@@ -6,11 +6,12 @@ if (! function_exists('system_monitoring_config')) {
     function system_monitoring_config(): array
     {
         $projectRoot = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
+        $jsonConfigPath = system_monitoring_resolve_json_config_path($projectRoot);
         $signatureParts = [];
         foreach ([
             $projectRoot . DIRECTORY_SEPARATOR . '.env',
             $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . '.env',
-            $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'system_monitoring.json',
+            $jsonConfigPath,
         ] as $path) {
             $signatureParts[] = $path;
             $signatureParts[] = system_monitoring_path_signature($path);
@@ -18,10 +19,10 @@ if (! function_exists('system_monitoring_config')) {
 
         $cacheKey = 'system_monitoring.config.' . sha1(implode('|', $signatureParts));
 
-        return system_monitoring_cache_remember($cacheKey, 300, static function () use ($projectRoot): array {
+        return system_monitoring_cache_remember($cacheKey, 300, static function () use ($projectRoot, $jsonConfigPath): array {
             $env = system_monitoring_load_env($projectRoot . DIRECTORY_SEPARATOR . '.env');
             $fallbackEnv = system_monitoring_load_env($projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . '.env');
-            $jsonConfig = system_monitoring_load_json_config($projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'system_monitoring.json');
+            $jsonConfig = system_monitoring_load_json_config($jsonConfigPath);
 
             if ($fallbackEnv !== []) {
                 $env = array_merge($fallbackEnv, $env);
@@ -35,10 +36,14 @@ if (! function_exists('system_monitoring_config')) {
             $license = system_monitoring_env_value($env, ['license', 'license_key']) ?? '';
             $licenseRequired = system_monitoring_env_bool($env, ['license_required'], true);
             $allowUnlicensed = system_monitoring_env_bool($env, ['allow_unlicensed', 'developer_mode'], false);
+            $verifySsl = system_monitoring_env_bool($env, ['verify_ssl', 'ssl_verify'], true);
+            $databaseBackupDisableColumnStatistics = system_monitoring_env_bool($env, ['database_backup_disable_column_statistics'], true);
             $targetHost = rtrim(\SystemMonitoring\Support\IdentityContext::resolveTargetHost($env, $projectRoot), '/');
             $currentVersion = system_monitoring_env_value($env, ['currentversion', 'current_version']) ?? '0.0.0';
             $deviceId = system_monitoring_detect_device_id($env);
-            $requestDomain = \SystemMonitoring\Support\IdentityContext::normalizeDomain($targetHost);
+            $requestDomain = \SystemMonitoring\Support\IdentityContext::normalizeRequestDomain(
+                system_monitoring_env_value($env, ['request_domain', 'domain'])
+            ) ?? \SystemMonitoring\Support\IdentityContext::normalizeDomain($targetHost);
 
             $downloadChunkSize = (int) (system_monitoring_env_value($env, ['download_chunk_size']) ?? 1048576);
             if ($downloadChunkSize < 65536) {
@@ -108,6 +113,8 @@ if (! function_exists('system_monitoring_config')) {
                 'license' => $license,
                 'license_required' => $licenseRequired,
                 'allow_unlicensed' => $allowUnlicensed,
+                'verify_ssl' => $verifySsl,
+                'database_backup_disable_column_statistics' => $databaseBackupDisableColumnStatistics,
                 'device_id' => $deviceId,
                 'target_host' => $targetHost,
                 'request_domain' => $requestDomain,
@@ -255,6 +262,37 @@ if (! function_exists('system_monitoring_config')) {
         }
 
         return system_monitoring_save_json_config($path, $config);
+    }
+
+    function system_monitoring_json_config_paths(string $projectRoot): array
+    {
+        return [
+            $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring' . DIRECTORY_SEPARATOR . 'system_monitoring.json',
+            $projectRoot . DIRECTORY_SEPARATOR . 'system_monitoring_update_data' . DIRECTORY_SEPARATOR . 'system_monitoring.json',
+        ];
+    }
+
+    function system_monitoring_resolve_json_config_path(string $projectRoot): string
+    {
+        [$sourcePath, $targetPath] = system_monitoring_json_config_paths($projectRoot);
+
+        if (is_file($targetPath)) {
+            return $targetPath;
+        }
+
+        if (is_file($sourcePath)) {
+            $directory = dirname($targetPath);
+            if (! is_dir($directory)) {
+                @mkdir($directory, 0777, true);
+            }
+
+            $contents = file_get_contents($sourcePath);
+            if (is_string($contents)) {
+                file_put_contents($targetPath, $contents, LOCK_EX);
+            }
+        }
+
+        return $targetPath;
     }
 
     function system_monitoring_env_value(array $env, array $keys): ?string

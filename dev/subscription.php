@@ -8,13 +8,23 @@ use Illuminate\Support\Facades\Route;
 
 Route::redirect('/subscription', '/subscription/', 302);
 
+$resolveBrowserDomain = static function (Request $request): ?string {
+    $candidate = trim((string) ($request->input('request_domain') ?? $request->input('domain') ?? $request->header('X-Request-Domain') ?? ''));
+    if ($candidate === '') {
+        return null;
+    }
+
+    return \SystemMonitoring\Support\IdentityContext::normalizeRequestDomain($candidate);
+};
+
 Route::get('/subscription/', function () {
-    return view('system-monitoring.subscription');
+    return view('subscription');
 })->name('subscription.index');
 
-Route::get('/subscription/data', function () {
+Route::get('/subscription/data', function (Request $request) use ($resolveBrowserDomain) {
     require_once base_path('system_monitoring/license.php');
 
+    $browserDomain = $resolveBrowserDomain($request);
     $status = system_monitoring_license_status();
     $state = is_array($status['state'] ?? null) ? $status['state'] : [];
     $expiresAt = (string) ($status['expires_at'] ?? $state['last_license_expires_at'] ?? $state['license_expires_at'] ?? '');
@@ -35,6 +45,8 @@ Route::get('/subscription/data', function () {
         'expires_at' => $expiresAt !== '' ? $expiresAt : null,
         'maintenance_end_date' => $maintenanceEndDate !== '' ? $maintenanceEndDate : null,
         'service_entitlement' => $serviceEntitlement,
+        'request_domain' => $browserDomain ?? ($status['config']['request_domain'] ?? null),
+        'browser_domain' => $browserDomain,
         'expires_at_label' => $expiresAt !== '' ? (function () use ($expiresAt) {
             try {
                 return (new DateTimeImmutable($expiresAt))->format('d M Y, h:i A');
@@ -52,22 +64,49 @@ Route::get('/subscription/data', function () {
     ]);
 })->name('subscription.data');
 
-Route::post('/subscription/save', function (Request $request) {
+Route::post('/subscription/save', function (Request $request) use ($resolveBrowserDomain) {
     $request->validate([
         'license' => ['required', 'string', 'max:255'],
     ]);
 
-    $path = base_path('system_monitoring_update_data/system_monitoring.json');
     require_once base_path('system_monitoring/license.php');
 
-    \system_monitoring_update_json_config($path, [
-        'license' => trim((string) $request->input('license')),
+    $systemConfig = system_monitoring_config();
+    $licenseValue = trim((string) $request->input('license'));
+    $browserDomain = $resolveBrowserDomain($request);
+    $verificationConfig = array_merge($systemConfig, [
+        'license' => $licenseValue,
+        'request_domain' => $browserDomain ?? ($systemConfig['request_domain'] ?? null),
     ]);
 
-    $systemConfig = system_monitoring_config();
-    $licenseClient = new VerifyLicenseClient(new HttpClient(), $systemConfig);
+    $licenseClient = new VerifyLicenseClient(new HttpClient(), $verificationConfig);
     $verification = $licenseClient->verify();
     $verificationData = is_array($verification['json'] ?? null) ? $verification['json'] : [];
+    $errorMessage = system_monitoring_license_verification_error($verification);
+
+    if ($errorMessage !== null) {
+        return response()->json([
+            'status' => false,
+            'message' => $errorMessage,
+            'verification' => [
+                'ok' => (bool) ($verification['ok'] ?? false),
+                'subscription_type' => $verificationData['subscription_type'] ?? null,
+                'effective_status' => $verificationData['effective_status'] ?? null,
+                'reason' => $verificationData['reason'] ?? null,
+            ],
+        ], 422);
+    }
+
+    $path = \system_monitoring_resolve_json_config_path(base_path());
+    $jsonChanges = [
+        'license' => $licenseValue,
+    ];
+
+    if ($browserDomain !== null) {
+        $jsonChanges['request_domain'] = $browserDomain;
+    }
+
+    \system_monitoring_update_json_config($path, $jsonChanges);
 
     $state = UpdateState::load($systemConfig['state_file']);
     $state['last_license_check_at'] = gmdate('c');
@@ -81,6 +120,9 @@ Route::post('/subscription/save', function (Request $request) {
     $state['license_effective_status'] = $verificationData['effective_status'] ?? null;
     $state['license_expires_at'] = $verificationData['expires_at'] ?? null;
     $state['license_maintenance_end_date'] = $verificationData['maintenance_end_date'] ?? null;
+    if ($browserDomain !== null) {
+        $state['request_domain'] = $browserDomain;
+    }
     UpdateState::save($systemConfig['state_file'], $state);
 
     return response()->json([
@@ -92,6 +134,7 @@ Route::post('/subscription/save', function (Request $request) {
             'effective_status' => $verificationData['effective_status'] ?? null,
             'expires_at' => $verificationData['expires_at'] ?? null,
             'maintenance_end_date' => $verificationData['maintenance_end_date'] ?? null,
+            'request_domain' => $browserDomain ?? ($systemConfig['request_domain'] ?? null),
             'expires_at_label' => isset($verificationData['expires_at']) && $verificationData['expires_at'] !== null
                 ? (function () use ($verificationData) {
                     try {

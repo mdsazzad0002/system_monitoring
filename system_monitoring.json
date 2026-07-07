@@ -1,0 +1,22 @@
+{
+    "license": "",
+    "target_host": "https://system.likesoftbd.com",
+    "verify_ssl": false,
+    "database_backup_disable_column_statistics": true,
+    "software_id": "pharmacy",
+    "current_version": "1",
+    "update_mode": "partial",
+    "auto_recovery": true,
+    "auto_download_update": true,
+    "auto_database_backup": true,
+    "database_backup_times": "12:00,22:00",
+    "database_backup_min_gap_hours": 6,
+    "database_backup_retry_minutes": 1,
+    "database_backup_stale_retry_minutes": 1,
+    "database_backup_chunk_size": 2097152,
+    "database_backup_timeout": 60,
+    "database_backup_keep_local": false,
+    "download_chunk_size": 1048576,
+    "download_timeout": 50,
+    "update_cache_ttl_seconds": 120
+}

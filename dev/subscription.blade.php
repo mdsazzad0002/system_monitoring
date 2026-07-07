@@ -112,6 +112,10 @@
                 <span class="subscription-label">Status</span>
                 <div id="licenseStatus" class="subscription-value">-</div>
             </div>
+            <div class="subscription-meta-item">
+                <span class="subscription-label">Request Domain</span>
+                <div id="requestDomain" class="subscription-value">-</div>
+            </div>
         </div>
 
         <div class="mb-3">
@@ -141,6 +145,7 @@ const subscriptionType = document.getElementById('subscriptionType');
 const expiresAt = document.getElementById('expiresAt');
 const maintenanceEndAt = document.getElementById('maintenanceEndAt');
 const licenseStatus = document.getElementById('licenseStatus');
+const requestDomain = document.getElementById('requestDomain');
 const licenseInput = document.getElementById('licenseInput');
 const saveBtn = document.getElementById('saveBtn');
 const refreshBtn = document.getElementById('refreshBtn');
@@ -168,13 +173,17 @@ function setBusy(isBusy, label) {
 async function loadSubscription() {
     setBusy(true, 'Loading subscription...');
     try {
-        const response = await fetch(endpoints.data, { headers: { 'Accept': 'application/json' } });
+        const browserDomain = window.location.host || window.location.hostname || '';
+        const response = await fetch(`${endpoints.data}?domain=${encodeURIComponent(browserDomain)}`, {
+            headers: { 'Accept': 'application/json' }
+        });
         const data = await response.json();
 
         licenseInput.value = data.license ?? '';
         subscriptionType.textContent = data.subscription_type ?? 'Not available';
         expiresAt.textContent = data.expires_at_label ?? data.expires_at ?? 'Not available';
         maintenanceEndAt.textContent = data.maintenance_end_date_label ?? data.maintenance_end_date ?? 'Not available';
+        requestDomain.textContent = data.request_domain ?? browserDomain ?? 'Not available';
         licenseStatus.textContent = data.service_entitlement === false
             ? 'maintenance_expired'
             : (data.license_effective_status ?? (data.license_reason ?? 'unknown'));
@@ -203,6 +212,7 @@ async function saveLicense() {
     try {
         const form = new FormData();
         form.append('license', licenseInput.value.trim());
+        form.append('domain', window.location.host || window.location.hostname || '');
 
         const response = await fetch(endpoints.save, {
             method: 'POST',

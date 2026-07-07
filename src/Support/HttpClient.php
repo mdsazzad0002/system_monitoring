@@ -11,20 +11,21 @@ final class HttpClient
         $method = strtoupper($method);
         $headers = $options['headers'] ?? [];
         $timeout = (int) ($options['timeout'] ?? 30);
+        $verifySsl = (bool) ($options['verify_ssl'] ?? true);
         $body = $options['body'] ?? null;
         $downloadTo = $options['download_to'] ?? null;
         $range = $options['range'] ?? null;
         $expectJson = $options['expect_json'] ?? true;
 
         if ($downloadTo !== null && ! ($options['force_curl'] ?? false)) {
-            return $this->streamRequest($method, $url, $headers, $timeout, $body, $downloadTo, $range, $expectJson);
+            return $this->streamRequest($method, $url, $headers, $timeout, $body, $downloadTo, $range, $expectJson, $verifySsl);
         }
 
         if (function_exists('curl_init')) {
-            return $this->curlRequest($method, $url, $headers, $timeout, $body, $downloadTo, $range, $expectJson);
+            return $this->curlRequest($method, $url, $headers, $timeout, $body, $downloadTo, $range, $expectJson, $verifySsl);
         }
 
-        return $this->streamRequest($method, $url, $headers, $timeout, $body, $downloadTo, $range, $expectJson);
+        return $this->streamRequest($method, $url, $headers, $timeout, $body, $downloadTo, $range, $expectJson, $verifySsl);
     }
 
     public function head(string $url, array $options = []): array
@@ -41,7 +42,8 @@ final class HttpClient
         mixed $body,
         mixed $downloadTo,
         mixed $range,
-        bool $expectJson
+        bool $expectJson,
+        bool $verifySsl
     ): array {
         $handle = curl_init($url);
         $responseHeaders = [];
@@ -55,6 +57,8 @@ final class HttpClient
             CURLOPT_CONNECTTIMEOUT => $timeout,
             CURLOPT_TIMEOUT => $timeout,
             CURLOPT_CUSTOMREQUEST => $method,
+            CURLOPT_SSL_VERIFYPEER => $verifySsl,
+            CURLOPT_SSL_VERIFYHOST => $verifySsl ? 2 : 0,
             CURLOPT_HEADERFUNCTION => static function ($curl, string $header) use (&$responseHeaders, &$headerMap): int {
                 $len = strlen($header);
                 $trimmed = trim($header);
@@ -150,7 +154,8 @@ final class HttpClient
         mixed $body,
         mixed $downloadTo,
         mixed $range,
-        bool $expectJson
+        bool $expectJson,
+        bool $verifySsl
     ): array {
         $headerLines = [];
         foreach ($headers as $header) {
@@ -168,6 +173,11 @@ final class HttpClient
                 'timeout' => $timeout,
                 'ignore_errors' => true,
                 'content' => $body,
+            ],
+            'ssl' => $verifySsl ? [] : [
+                'verify_peer' => false,
+                'verify_peer_name' => false,
+                'allow_self_signed' => true,
             ],
         ]);
 
